@@ -1,0 +1,15 @@
+{
+  "name": "taskboard-server",
+  "version": "1.0.0",
+  "description": "Servidor de TaskBoard multi-usuario (Express + node:sqlite, sin dependencias nativas que compilar)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
