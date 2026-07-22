@@ -1,0 +1,2960 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TaskBoard — Panel de actividades</title>
+<style>
+  :root{
+    --bg:            #F6F9F8;
+    --panel:         #FFFFFF;
+    --panel-2:       #FBFDFC;
+    --panel-3:       #F0F4F3;
+    --border:        #E6ECEA;
+    --card-border:   #A9B8B2;
+    --border-soft:   #EDF2F0;
+    --text:          #1F2A2E;
+    --text-dim:      #6B7876;
+    --text-faint:    #697775;
+    --accent:        #2FA79B;
+    --accent-dark:   #1D7A70;
+    --accent-soft:   rgba(47,167,155,0.12);
+    --accent-soft-2: rgba(47,167,155,0.22);
+    --done:          #2FA79B;
+    --done-soft:     rgba(47,167,155,0.12);
+    --info:          #5B8DB8;
+    --info-soft:     rgba(91,141,184,0.12);
+    --pending:       #9BA6A3;
+    --pending-soft:  rgba(155,166,163,0.14);
+    --danger:        #D97757;
+    --today-line:    #E5484D;
+    --danger-soft:   rgba(217,119,87,0.13);
+    --weekend:       rgba(155,166,163,0.10);
+    --radius:        10px;
+    --shadow-sm:     0 1px 2px rgba(31,42,46,0.04), 0 1px 6px rgba(31,42,46,0.03);
+    --shadow-md:     0 4px 16px rgba(31,42,46,0.06), 0 1px 3px rgba(31,42,46,0.04);
+    --shadow-lg:     0 12px 40px rgba(31,42,46,0.10);
+    --font-sans:     -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-num:      -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; padding:0; height:100%;
+    background:var(--bg); color:var(--text);
+    font-family:var(--font-sans);
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{ background:var(--accent-soft-2); color:var(--text); }
+  ::-webkit-scrollbar{ height:9px; width:9px; }
+  ::-webkit-scrollbar-track{ background:transparent; }
+  ::-webkit-scrollbar-thumb{ background:#D7E0DD; border-radius:8px; }
+  ::-webkit-scrollbar-thumb:hover{ background:#C2CDC9; }
+  button{ font-family:inherit; cursor:pointer; }
+  input, textarea, select{ font-family:inherit; }
+  :focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+
+  #app{ display:flex; flex-direction:column; height:100vh; }
+
+  #boot-error{
+    position:fixed; inset:0; background:var(--bg); color:var(--text);
+    display:none; align-items:center; justify-content:center; padding:40px; z-index:9999;
+  }
+  #boot-error.show{ display:flex; }
+  #boot-error .box{ max-width:520px; text-align:center; }
+  #boot-error h2{ color:var(--danger); }
+  #boot-error pre{ text-align:left; background:var(--panel-3); padding:12px; border-radius:8px; overflow:auto; font-size:12px; color:var(--text-dim); }
+
+  /* ---------- Topbar ---------- */
+  .topbar{
+    display:flex; align-items:center; gap:18px;
+    padding:14px 24px;
+    border-bottom:1px solid var(--border-soft);
+    background:var(--panel);
+    flex-shrink:0;
+  }
+  .brand{
+    display:flex; align-items:center; gap:9px;
+    font-weight:700; font-size:15px; letter-spacing:0.1px;
+    flex-shrink:0; color:var(--text);
+  }
+  .brand .mark{
+    width:26px; height:26px; border-radius:8px;
+    background:var(--accent-soft);
+    display:flex; align-items:center; justify-content:center;
+    font-size:12px; font-weight:700; color:var(--accent-dark);
+  }
+  .board-tabs{ display:flex; gap:4px; flex:1; overflow-x:auto; }
+  .board-tab{
+    padding:7px 15px; border-radius:20px;
+    background:transparent; border:1px solid transparent;
+    color:var(--text-dim); font-size:12.5px; font-weight:500;
+    white-space:nowrap; transition:all .12s ease;
+  }
+  .board-tab:hover{ background:var(--panel-3); color:var(--text); }
+  .board-tab.active{ background:var(--accent-soft); color:var(--accent-dark); font-weight:600; }
+  .board-tab .del{ margin-left:8px; opacity:0.4; font-size:11px; }
+  .board-tab .del:hover{ opacity:1; color:var(--danger); }
+
+  .btn{
+    display:inline-flex; align-items:center; gap:6px;
+    padding:8px 15px; border-radius:8px;
+    border:1px solid var(--border); background:var(--panel);
+    color:var(--text); font-size:12.5px; font-weight:500;
+    transition:all .12s ease; white-space:nowrap;
+  }
+  .btn:hover{ border-color:#C2CDC9; background:var(--panel-3); }
+  .btn-accent{ background:var(--accent-dark); border-color:var(--accent-dark); color:#fff; font-weight:600; }
+  .btn-accent:hover{ background:#1B6D64; border-color:#1B6D64; }
+  .btn-ghost{ background:transparent; border-color:transparent; color:var(--text-dim); }
+  .btn-ghost:hover{ background:var(--panel-3); color:var(--text); }
+  .btn-sm{ padding:6px 11px; font-size:12px; }
+  .btn-icon{ padding:7px; }
+  .topbar-actions{ display:flex; gap:8px; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end; }
+  .sync-indicator{
+    display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--text-faint);
+    flex-shrink:0; padding:4px 10px; border-radius:20px; background:var(--panel-2);
+    border:1px solid var(--border-soft); cursor:help;
+  }
+  .sync-indicator .icon-svg{ width:13px; height:13px; }
+  .sync-ok{ color:var(--text-faint); }
+  .sync-busy{ color:var(--info); }
+  .sync-error{ color:var(--danger); font-weight:600; }
+  .loading-spinner{
+    width:28px; height:28px; border-radius:50%;
+    border:3px solid var(--border); border-top-color:var(--accent);
+    animation:tb-spin 0.8s linear infinite;
+  }
+  @keyframes tb-spin{ to{ transform:rotate(360deg); } }
+
+  /* ---------- Layout principal ---------- */
+  .layout{ flex:1; display:flex; overflow:hidden; }
+  .workspace{ flex:1; display:flex; flex-direction:column; overflow:hidden; min-width:0; }
+  .sidebar-stats{
+    width:270px; min-width:270px; background:var(--panel);
+    border-left:1px solid var(--border-soft);
+    overflow-y:auto; padding:20px 18px;
+    display:flex; flex-direction:column; gap:22px;
+  }
+
+  .filterbar{
+    display:flex; align-items:center; gap:10px;
+    padding:10px 24px; border-bottom:1px solid var(--border-soft);
+    background:var(--panel-2);
+    flex-shrink:0; flex-wrap:wrap;
+  }
+  .filterbar .label{ font-size:11px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.5px; font-weight:600; }
+  .chip{
+    padding:4px 11px; border-radius:20px; font-size:11.5px; font-weight:500;
+    border:1px solid var(--border); color:var(--text-dim); background:var(--panel);
+    display:flex; align-items:center; gap:6px; cursor:pointer;
+  }
+  .chip.active{ border-color:var(--accent); color:var(--accent-dark); background:var(--accent-soft); }
+  .chip .dot{ width:7px; height:7px; border-radius:50%; }
+
+  /* ---------- Panel divider (kanban / gantt) ---------- */
+  .panel-section{ display:flex; flex-direction:column; min-height:0; }
+  .panel-section.kanban-section{ flex:0 0 auto; height:46%; border-bottom:1px solid var(--border-soft); }
+  .panel-section.gantt-section{ flex:1; min-height:0; }
+  .panel-heading{
+    display:flex; align-items:center; gap:8px;
+    padding:12px 24px 10px; flex-shrink:0;
+    font-size:11px; font-weight:700; color:var(--text-faint);
+    text-transform:uppercase; letter-spacing:0.6px;
+  }
+  .panel-heading .line{ flex:1; height:1px; background:var(--border-soft); }
+  .gantt-zoom{ display:flex; align-items:center; gap:6px; flex-shrink:0; color:var(--text-faint); }
+  .gantt-zoom-slider{
+    width:90px; height:4px; border-radius:3px; background:var(--border);
+    -webkit-appearance:none; appearance:none; outline:none; cursor:pointer;
+  }
+  .gantt-zoom-slider::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none;
+    width:14px; height:14px; border-radius:50%;
+    background:var(--accent-dark); cursor:pointer; border:2px solid #fff;
+    box-shadow:0 0 0 1px var(--border);
+  }
+  .gantt-zoom-slider::-moz-range-thumb{
+    width:14px; height:14px; border-radius:50%; border:2px solid #fff;
+    background:var(--accent-dark); cursor:pointer; box-shadow:0 0 0 1px var(--border);
+  }
+  .resize-handle{
+    height:4px; flex-shrink:0; cursor:row-resize; position:relative;
+    background:transparent;
+  }
+  .resize-handle::before{
+    content:''; position:absolute; left:0; right:0; top:-4px; bottom:-4px;
+  }
+  .resize-handle:hover::after, .resize-handle.active::after{ background:var(--accent); }
+  .resize-handle::after{
+    content:''; position:absolute; left:50%; top:1.5px; transform:translateX(-50%);
+    width:28px; height:2px; border-radius:2px; background:#D7E0DD;
+  }
+
+  /* ---------- Kanban ---------- */
+  .kanban-wrap{ flex:1; overflow-x:auto; overflow-y:hidden; padding:2px 24px 16px; min-height:0; }
+  .kanban{ display:flex; gap:16px; height:100%; align-items:flex-start; }
+
+  .column{
+    width:272px; min-width:272px; background:var(--panel-2);
+    border-radius:var(--radius); border:1px solid var(--border-soft);
+    display:flex; flex-direction:column; max-height:100%;
+    position:relative;
+  }
+  .column.drag-over{ border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft-2); }
+  .column-resize-handle{
+    position:absolute; top:0; right:-5px; bottom:0; width:10px;
+    cursor:col-resize; z-index:5;
+  }
+  .column-resize-handle::after{
+    content:''; position:absolute; top:0; bottom:0; left:50%; transform:translateX(-50%);
+    width:2px; background:transparent; transition:background .1s ease;
+  }
+  .column-resize-handle:hover::after, .column-resize-handle.active::after{ background:var(--accent); }
+  .column-head{
+    display:flex; align-items:center; gap:8px;
+    padding:12px 11px 10px 13px;
+  }
+  .column-head .col-color{ width:10px; height:10px; border-radius:50%; flex-shrink:0; cursor:pointer; border:2px solid rgba(255,255,255,0.6); box-shadow:0 0 0 1px rgba(0,0,0,0.06); }
+  .column-head .col-color:hover{ transform:scale(1.15); }
+  .column-title{
+    flex:1; font-weight:600; font-size:13px; background:transparent;
+    border:none; color:var(--text); outline:none; padding:2px 0; min-width:0;
+  }
+  .column-count{
+    font-size:11px; font-weight:600; color:var(--text-faint);
+    background:var(--panel); padding:2px 8px; border-radius:10px;
+    border:1px solid var(--border-soft);
+  }
+  .column-menu-btn{ color:var(--text-faint); padding:4px 6px; border-radius:6px; background:none; border:none; }
+  .column-menu-btn:hover{ background:var(--panel-3); color:var(--danger); }
+
+  .column-body{
+    flex:1; overflow-y:auto; padding:6px 9px 9px; min-height:60px;
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr));
+    align-content:start; gap:8px;
+  }
+  .add-card-btn{
+    grid-column:1 / -1;
+    margin:2px 0 2px; padding:8px 10px; border-radius:8px;
+    background:transparent; border:1px dashed var(--border);
+    color:var(--text-faint); font-size:12px; text-align:left; width:100%;
+  }
+  .add-card-btn:hover{ border-color:var(--accent); color:var(--accent-dark); background:var(--accent-soft); }
+
+  .add-column{
+    width:230px; min-width:230px; height:42px;
+    border-radius:var(--radius); border:1px dashed var(--border);
+    color:var(--text-faint); font-size:12.5px; font-weight:500;
+    display:flex; align-items:center; justify-content:center; gap:6px;
+    background:transparent; align-self:flex-start;
+  }
+  .add-column:hover{ border-color:var(--accent); color:var(--accent-dark); }
+
+  .card{
+    background:var(--panel); border:1px solid var(--card-border);
+    border-radius:9px; padding:10px 12px; cursor:grab;
+    transition:all .12s ease;
+    box-shadow:var(--shadow-sm);
+    position:relative;
+  }
+  .card:hover{ border-color:#A9BAB4; box-shadow:var(--shadow-md); transform:translateY(-1px); }
+  .card.dragging{ opacity:0.4; }
+  .card.card-milestone{ border-left:3px solid var(--text-dim); }
+  .card-title-row{ display:flex; align-items:center; gap:7px; margin-bottom:8px; }
+  .card-avatar{
+    width:19px; height:19px; border-radius:50%; flex-shrink:0;
+    background:var(--accent-soft); color:var(--accent-dark);
+    display:flex; align-items:center; justify-content:center;
+    font-size:10px; font-weight:700;
+  }
+  .milestone-diamond{
+    width:9px; height:9px; flex-shrink:0; transform:rotate(45deg);
+    border-radius:2px; display:inline-block;
+  }
+  .card-title{ font-size:13px; font-weight:500; line-height:1.4; word-break:break-word; color:var(--text); margin-bottom:0; }
+  .card-meta{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .card-badge{
+    display:flex; align-items:center; gap:4px;
+    font-size:10.5px; font-weight:500; color:var(--text-dim);
+    padding:3px 7px; border-radius:6px; background:var(--panel-3);
+  }
+  .card-badge.overdue{ color:var(--danger); background:var(--danger-soft); }
+  .card-badge.due-soon{ color:var(--accent-dark); background:var(--accent-soft); }
+  .icon-svg{ width:12px; height:12px; flex-shrink:0; color:currentColor; }
+  .btn .icon-svg{ width:13px; height:13px; }
+  .card-priority{ width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+  .card-progress-track{ height:4px; background:var(--panel-3); border-radius:3px; margin-top:9px; overflow:hidden; }
+  .card-progress-fill{ height:100%; background:var(--accent); border-radius:3px; }
+
+  .empty-state{
+    height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    color:var(--text-faint); gap:10px; text-align:center; padding:30px;
+  }
+  .empty-state .big{ font-size:14px; color:var(--text-dim); font-weight:600; }
+  .empty-state .small{ font-size:12.5px; max-width:300px; }
+
+  /* ---------- Modal ---------- */
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(31,42,46,0.35);
+    display:flex; align-items:flex-start; justify-content:center;
+    padding:40px 20px; overflow-y:auto; z-index:100;
+    backdrop-filter:blur(2px);
+  }
+  .modal{
+    background:var(--panel); border:1px solid var(--border-soft);
+    border-radius:16px; width:100%; max-width:540px;
+    box-shadow:var(--shadow-lg);
+  }
+  .modal-head{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:17px 20px; border-bottom:1px solid var(--border-soft);
+  }
+  .modal-head h3{ margin:0; font-size:14.5px; font-weight:700; }
+  .modal-body{ padding:20px; display:flex; flex-direction:column; gap:15px; }
+  .modal-foot{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:14px 20px; border-top:1px solid var(--border-soft);
+  }
+  .field{ display:flex; flex-direction:column; gap:6px; }
+  .field label{ font-size:11px; font-weight:600; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.4px; }
+  .field input[type=text], .field textarea, .field select, .field input[type=date]{
+    background:var(--panel-2); border:1px solid var(--border); border-radius:8px;
+    padding:9px 11px; color:var(--text); font-size:13px; outline:none; width:100%;
+  }
+  .field input:focus, .field textarea:focus, .field select:focus{ border-color:var(--accent); background:var(--panel); }
+  .field textarea{ resize:vertical; min-height:65px; font-family:var(--font-sans); }
+  .field-row{ display:flex; gap:12px; }
+  .field-row .field{ flex:1; }
+  .color-picker{ display:flex; gap:8px; }
+  .color-swatch{ width:24px; height:24px; border-radius:50%; border:2px solid transparent; cursor:pointer; box-shadow:0 0 0 1px var(--border-soft) inset; }
+  .color-swatch.selected{ border-color:var(--text); }
+  .priority-picker{ display:flex; gap:8px; }
+  .priority-opt{
+    flex:1; padding:7px 0; text-align:center; border-radius:8px; font-size:11.5px; font-weight:600;
+    border:1px solid var(--border); color:var(--text-dim); background:var(--panel-2); cursor:pointer;
+  }
+  .priority-opt.selected{ border-color:currentColor; background:color-mix(in srgb, currentColor 10%, white); }
+
+  /* ---------- Gantt ---------- */
+  .gantt-wrap{ flex:1; overflow:auto; padding:0; min-height:0; }
+  .gantt-inner{ display:flex; min-width:100%; }
+  .gantt-sidebar{
+    width:230px; min-width:230px; background:var(--panel);
+    border-right:1px solid var(--border-soft); position:sticky; left:0; z-index:5;
+  }
+  .gantt-sidebar-resize-handle{
+    position:sticky; width:8px; margin-left:-4px; flex-shrink:0;
+    cursor:col-resize; z-index:6; align-self:stretch;
+  }
+  .gantt-sidebar-resize-handle::after{
+    content:''; position:absolute; top:0; bottom:0; left:50%; transform:translateX(-50%);
+    width:2px; background:transparent; transition:background .1s ease;
+  }
+  .gantt-sidebar-resize-handle:hover::after, .gantt-sidebar-resize-handle.active::after{ background:var(--accent); }
+  .gantt-sidebar-head{
+    height:52px; display:flex; align-items:center; gap:8px; padding:0 14px;
+    font-size:10.5px; font-weight:700; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.5px;
+    border-bottom:1px solid var(--border-soft); background:var(--panel);
+    position:sticky; top:0; z-index:6;
+  }
+  .gantt-row-label{
+    height:36px; display:flex; align-items:center; gap:8px; padding:0 14px;
+    font-size:12px; border-bottom:1px solid var(--border-soft);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:grab;
+  }
+  .gantt-row-label.dragging{ opacity:0.4; }
+  .gantt-row-label.drag-over-row{ background:var(--accent-soft); box-shadow:inset 0 2px 0 var(--accent-dark); }
+  .gantt-row-label:hover{ background:var(--panel-2); }
+  .gantt-row-index{
+    flex-shrink:0; width:20px; text-align:right; font-weight:700;
+    color:var(--text-faint); font-size:11px;
+  }
+  .gantt-sidebar-head .gantt-row-index{ font-size:10.5px; }
+  .gantt-scroll{ flex:1; position:relative; }
+  .gantt-ruler{
+    position:sticky; top:0; z-index:4; background:var(--panel);
+    border-bottom:1px solid var(--border-soft); display:flex; flex-direction:column;
+  }
+  .gantt-ruler-months{ display:flex; height:20px; }
+  .gantt-ruler-month{
+    display:flex; align-items:center; padding-left:8px;
+    font-size:10.5px; font-weight:700; color:var(--text-dim);
+    border-right:1px solid var(--border-soft); border-bottom:1px solid var(--border-soft);
+    text-transform:capitalize;
+  }
+  .gantt-ruler-days{ display:flex; height:32px; }
+  .gantt-ruler-day{
+    min-width:32px; width:32px; border-right:1px solid var(--border-soft);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-size:10px; color:var(--text-faint); flex-shrink:0;
+  }
+  .gantt-ruler-day.weekend{ background:var(--weekend); }
+  .gantt-ruler-day.today{ background:rgba(229,72,77,0.12); color:#B7282E; font-weight:700; }
+  .gantt-ruler-day .dow{ font-size:8.5px; opacity:0.7; }
+  .gantt-body{ position:relative; }
+  .gantt-weekend-col{
+    position:absolute; top:0; bottom:0; width:32px; background:var(--weekend); z-index:0;
+  }
+  .gantt-track{
+    height:36px; position:relative; border-bottom:1px solid var(--border-soft);
+  }
+  .gantt-bar{
+    position:absolute; top:6px; height:24px; border-radius:7px;
+    display:flex; align-items:center; padding:0 9px; font-size:11px; font-weight:600;
+    color:#fff; white-space:nowrap; overflow:hidden; cursor:grab;
+    box-shadow:0 1px 3px rgba(31,42,46,0.15); z-index:2;
+  }
+  .gantt-bar:active{ cursor:grabbing; }
+  .gantt-bar-content{
+    display:flex; align-items:center; justify-content:center; width:100%;
+    overflow:hidden; position:relative; pointer-events:none;
+  }
+  .gantt-bar-pct{
+    font-weight:700; opacity:0.95;
+    font-variant-numeric:tabular-nums;
+  }
+  .gantt-bar-handle{
+    position:absolute; top:0; bottom:0; width:8px; cursor:ew-resize; z-index:3;
+  }
+  .gantt-bar-handle.left{ left:0; border-radius:7px 0 0 7px; }
+  .gantt-bar-handle.right{ right:0; border-radius:0 7px 7px 0; }
+  .gantt-bar-handle:hover{ background:rgba(255,255,255,0.35); }
+  .gantt-milestone{
+    position:absolute; top:9px; width:18px; height:18px; margin-left:-9px;
+    transform:rotate(45deg); border-radius:3px; cursor:pointer; z-index:2;
+    box-shadow:0 1px 3px rgba(31,42,46,0.2);
+  }
+  .gantt-milestone:hover{ filter:brightness(0.92); }
+  .gantt-conn-port{
+    position:absolute; right:-6px; top:50%; transform:translateY(-50%) rotate(0deg);
+    width:12px; height:12px; border-radius:50%; background:#fff;
+    border:2px solid var(--accent-dark); cursor:crosshair; z-index:4;
+    opacity:0; transition:opacity .12s ease, transform .12s ease;
+  }
+  .gantt-milestone .gantt-conn-port{ transform:translateY(-50%) rotate(-45deg); right:-7px; }
+  .gantt-bar:hover .gantt-conn-port, .gantt-milestone:hover .gantt-conn-port{ opacity:1; }
+  .gantt-conn-port:hover{ background:var(--accent-dark); transform:translateY(-50%) scale(1.25); }
+  .gantt-milestone:hover .gantt-conn-port:hover{ transform:translateY(-50%) rotate(-45deg) scale(1.25); }
+  .gantt-bar.gantt-conn-target, .gantt-milestone.gantt-conn-target{
+    outline:2px solid var(--accent-dark); outline-offset:2px;
+  }
+  .gantt-dep-svg{
+    position:absolute; top:0; left:0; z-index:1; pointer-events:none; overflow:visible;
+  }
+  .gantt-dep-live-svg{
+    position:absolute; top:0; left:0; z-index:10; pointer-events:none; overflow:visible;
+  }
+  .gantt-today-line{
+    position:absolute; top:0; bottom:0; width:2px; z-index:3;
+    background-image:repeating-linear-gradient(to bottom, var(--today-line) 0, var(--today-line) 6px, transparent 6px, transparent 12px);
+  }
+  .gantt-today-line::before{
+    content:''; position:absolute; top:-1px; left:50%; transform:translateX(-50%);
+    width:8px; height:8px; border-radius:50%; background:var(--today-line);
+  }
+
+  /* ---------- Sidebar de indicadores ---------- */
+  .stats-block{ display:flex; flex-direction:column; gap:12px; }
+  .stats-title{
+    font-size:10.5px; font-weight:700; color:var(--text-faint);
+    text-transform:uppercase; letter-spacing:0.6px;
+  }
+  .stat-row{
+    display:flex; align-items:baseline; justify-content:space-between;
+    padding:9px 0; border-bottom:1px solid var(--border-soft);
+  }
+  .stat-row:last-child{ border-bottom:none; }
+  .stat-label{ font-size:12.5px; color:var(--text-dim); display:flex; align-items:center; gap:7px; }
+  .stat-label .sw{ width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+  .stat-value{ font-size:17px; font-weight:700; color:var(--text); letter-spacing:-0.3px; }
+  .stat-value.warn{ color:var(--accent-dark); }
+  .stat-value.danger{ color:var(--danger); }
+  .stat-value.done{ color:var(--accent-dark); }
+
+  /* Donut de avance promedio */
+  .donut-wrap{ display:flex; align-items:center; justify-content:center; padding:6px 0 2px; }
+  .donut-center-label{ font-size:22px; font-weight:700; fill:var(--text); }
+  .donut-center-sub{ font-size:8.5px; fill:var(--text-faint); font-weight:600; letter-spacing:0.4px; }
+
+  .progress-overview{ display:flex; flex-direction:column; gap:8px; }
+  .progress-bar-track{
+    height:8px; border-radius:5px; background:var(--panel-3);
+    overflow:hidden; display:flex;
+  }
+  .progress-seg{ height:100%; }
+  .progress-legend{ display:flex; flex-direction:column; gap:7px; font-size:11.5px; margin-top:4px; }
+  .progress-legend .item{ display:flex; align-items:center; gap:7px; color:var(--text-dim); }
+  .progress-legend .sw{ width:8px; height:8px; border-radius:3px; flex-shrink:0; }
+  .progress-legend .num{ font-weight:700; color:var(--text); margin-left:auto; }
+
+  .empty-sidebar{ font-size:12px; color:var(--text-faint); line-height:1.5; }
+
+  /* ---------- Confirm / import modal ---------- */
+  .hidden{ display:none !important; }
+  .row{ display:flex; align-items:center; gap:8px; }
+  .import-drop{
+    border:1.5px dashed var(--border); border-radius:12px; padding:28px 16px;
+    text-align:center; color:var(--text-faint); font-size:12.5px; cursor:pointer;
+    transition:all .12s ease; background:var(--panel-2);
+  }
+  .import-drop:hover, .import-drop.drag-over{ border-color:var(--accent); color:var(--accent-dark); background:var(--accent-soft); }
+  .import-drop strong{ color:var(--text-dim); }
+
+  /* ---------- Vista de exportación a PDF ---------- */
+  #pdf-snapshot{ display:none; }
+  .pdf-page{ padding:40px; }
+  .pdf-cover{
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    height:100vh; text-align:center; gap:10px;
+  }
+  .pdf-cover-mark{
+    width:56px; height:56px; border-radius:16px; background:var(--accent-soft);
+    color:var(--accent-dark); font-weight:700; font-size:22px;
+    display:flex; align-items:center; justify-content:center; margin-bottom:12px;
+  }
+  .pdf-cover h1{ font-size:30px; margin:0; color:var(--text); }
+  .pdf-cover h2{ font-size:18px; margin:0; font-weight:500; color:var(--text-dim); }
+  .pdf-cover p{ font-size:12.5px; color:var(--text-faint); margin:6px 0 20px; }
+  .pdf-cover-stats{ display:flex; gap:28px; font-size:13px; color:var(--text-dim); }
+  .pdf-cover-stats strong{ display:block; font-size:22px; color:var(--text); font-weight:700; }
+  .pdf-section-title{ font-size:16px; color:var(--text); border-bottom:2px solid var(--border); padding-bottom:8px; margin-bottom:16px; }
+  .pdf-table{ width:100%; border-collapse:collapse; font-size:11px; }
+  .pdf-table th{
+    text-align:left; padding:7px 8px; background:var(--panel-3); color:var(--text-dim);
+    font-size:10px; text-transform:uppercase; letter-spacing:0.4px; border-bottom:1px solid var(--border);
+  }
+  .pdf-table td{ padding:7px 8px; border-bottom:1px solid var(--border-soft); color:var(--text); }
+  .pdf-gantt-page .gantt-wrap{ height:auto; }
+
+  @media print{
+    body *{ visibility:hidden; }
+    #pdf-snapshot, #pdf-snapshot *{ visibility:visible; }
+    #pdf-snapshot{ display:block; position:absolute; top:0; left:0; width:100%; }
+    .pdf-page{ page-break-after:always; }
+    .pdf-page:last-child{ page-break-after:auto; }
+    .pdf-gantt-page .gantt-sidebar{ position:static; }
+    .pdf-gantt-page .gantt-ruler{ position:static; }
+    .resize-handle, .gantt-bar-handle{ display:none !important; }
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="boot-error">
+  <div class="box">
+    <h2>No se pudo iniciar TaskBoard</h2>
+    <p>Ocurrió un error de JavaScript al cargar. Detalle técnico abajo — puedes copiarlo y compartirlo para pedir ayuda.</p>
+    <pre id="boot-error-detail"></pre>
+  </div>
+</div>
+
+<script>
+window.addEventListener('error', function(e){
+  var elx = document.getElementById('boot-error');
+  var detail = document.getElementById('boot-error-detail');
+  if (elx && detail) {
+    detail.textContent = (e.message || 'Error desconocido') + '\n' + (e.filename||'') + ':' + (e.lineno||'');
+    elx.classList.add('show');
+  }
+});
+/* Ahora que hay operaciones async (window.storage.get/set hacia el
+   almacenamiento compartido), un error dentro de una promesa no controlada
+   no dispara el evento 'error' de arriba — necesita su propio listener,
+   o quedaría fallando en silencio sin que la persona se entere. */
+window.addEventListener('unhandledrejection', function(e){
+  var elx = document.getElementById('boot-error');
+  var detail = document.getElementById('boot-error-detail');
+  if (elx && detail) {
+    var reason = e.reason;
+    detail.textContent = 'Error asíncrono: ' + ((reason && reason.stack) || (reason && reason.message) || String(reason));
+    elx.classList.add('show');
+  }
+});
+</script>
+
+<script>
+
+
+
+
+
+
+
+
+/* ===================== Utilidades ===================== */
+/* Esta versión guarda los datos en un servidor propio (Node + SQLite), vía
+   fetch() a /api/data. TODOS los que abran esta página web ven y editan el
+   MISMO tablero — ya no es almacenamiento privado del navegador
+   (localStorage), ni tampoco el almacenamiento de artifacts de Claude; es un
+   backend real corriendo en el hosting que tú elijas. */
+var EMAIL_RECIPIENTS_KEY = 'taskboard_email_recipients_v1'; // esta sí queda privada (ver más abajo)
+
+/* Los destinatarios de correo recordados SON privados de cada persona (no
+   tendría sentido que el "último correo que usó Juan" se le sugiera a María),
+   así que esta preferencia se queda en localStorage normal del navegador,
+   no en el servidor compartido. */
+function loadSavedRecipients(){
+  try { return localStorage.getItem(EMAIL_RECIPIENTS_KEY) || ''; }
+  catch(e){ return ''; }
+}
+function saveRecipients(value){
+  try { localStorage.setItem(EMAIL_RECIPIENTS_KEY, value); }
+  catch(e){ /* no crítico: solo es una comodidad, no persistencia de datos */ }
+}
+function uid(){ return Math.random().toString(36).slice(2, 10); }
+
+/* Paleta pastel para columnas: cada entrada tiene un tono de fondo suave
+   (para toda la columna) y un acento algo más saturado del MISMO matiz
+   (usado en el punto de color y el borde superior), para que combinen
+   entre sí en vez de competir. */
+var COLUMN_PALETTE = [
+  { name: 'Gris perla',   bg: '#EEF1F0', accent: '#8A968F' },
+  { name: 'Azul cielo',   bg: '#E7EEF5', accent: '#5B8DB8' },
+  { name: 'Verde menta',  bg: '#E5F2EE', accent: '#3FA88E' },
+  { name: 'Durazno',      bg: '#F6EAE3', accent: '#D97757' },
+  { name: 'Lavanda',      bg: '#EEEAF5', accent: '#8B7BB8' },
+  { name: 'Amarillo suave', bg: '#F7F1E1', accent: '#C7A23F' },
+  { name: 'Rosa polvo',   bg: '#F6E9EE', accent: '#C4708C' }
+];
+// Compat: algunas funciones antiguas usaban COLUMN_COLORS (solo el acento)
+var COLUMN_COLORS = COLUMN_PALETTE.map(function(p){ return p.accent; });
+
+/* Prioridad: mismo matiz que columnas "Durazno"/"Azul"/"Verde menta" pero
+   más intensos, para que la tarjeta combine con cualquier fondo de columna
+   en vez de generar un choque de color. */
+var PRIORITIES = [
+  { key: 'low',  label: 'Baja',  color: '#3FA88E', soft: 'rgba(63,168,142,0.16)' },
+  { key: 'med',  label: 'Media', color: '#5B8DB8', soft: 'rgba(91,141,184,0.16)' },
+  { key: 'high', label: 'Alta',  color: '#D97757', soft: 'rgba(217,119,87,0.18)' }
+];
+
+var ACTIVITY_TYPES = [
+  { key: 'task',      label: 'Actividad' },
+  { key: 'milestone', label: 'Hito' }
+];
+
+function todayISO(){ return new Date().toISOString().slice(0, 10); }
+function parseDate(d){
+  if (!d) return null;
+  var parts = d.split('-').map(Number);
+  return new Date(parts[0], parts[1] - 1, parts[2]);
+}
+function fmtShort(d){
+  if (!d) return '';
+  var dt = parseDate(d);
+  return dt.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+}
+function daysBetween(a, b){ return Math.round((b - a) / 86400000); }
+function addDays(date, n){ var d = new Date(date); d.setDate(d.getDate() + n); return d; }
+function durationDays(startDate, dueDate){
+  if (!startDate || !dueDate) return null;
+  var d = daysBetween(parseDate(startDate), parseDate(dueDate)) + 1;
+  return d > 0 ? d : null;
+}
+function fmtDuration(startDate, dueDate){
+  var d = durationDays(startDate, dueDate);
+  if (d == null) return '';
+  return d === 1 ? '1 día' : d + ' días';
+}
+function isWeekend(date){
+  var day = date.getDay();
+  return day === 0 || day === 6;
+}
+/* Oscurece (percent negativo) o aclara (percent positivo) un color hex.
+   Se usa para derivar el borde de una columna a partir de su acento pastel. */
+function shadeColor(hex, percent){
+  hex = hex.replace('#','');
+  var num = parseInt(hex, 16);
+  var r = (num >> 16), g = (num >> 8 & 0x00FF), b = (num & 0x0000FF);
+  r = Math.max(0, Math.min(255, Math.round(r * (1 - percent))));
+  g = Math.max(0, Math.min(255, Math.round(g * (1 - percent))));
+  b = Math.max(0, Math.min(255, Math.round(b * (1 - percent))));
+  return '#' + (0x1000000 + r*0x10000 + g*0x100 + b).toString(16).slice(1);
+}
+function dueStatus(dueDate, done){
+  if (!dueDate || done) return null;
+  var today = parseDate(todayISO());
+  var due = parseDate(dueDate);
+  var diff = daysBetween(today, due);
+  if (diff < 0) return 'overdue';
+  if (diff <= 2) return 'due-soon';
+  return null;
+}
+function el(tag, attrs, children){
+  var e = document.createElement(tag);
+  attrs = attrs || {};
+  for (var k in attrs){
+    if (k === 'class') e.className = attrs[k];
+    else if (k === 'style') e.style.cssText = attrs[k];
+    else if (k.indexOf('on') === 0 && typeof attrs[k] === 'function') e.addEventListener(k.slice(2), attrs[k]);
+    else if (k === 'html') e.innerHTML = attrs[k];
+    else e.setAttribute(k, attrs[k]);
+  }
+  (children || []).forEach(function(c){
+    if (c == null) return;
+    if (typeof c === 'string') e.appendChild(document.createTextNode(c));
+    else e.appendChild(c);
+  });
+  return e;
+}
+
+/* Una columna se considera "columna de cierre" (tareas terminadas) si su
+   nombre contiene alguna de estas palabras. Se usa para los indicadores. */
+var DONE_HINTS = ['hecho', 'termin', 'complet', 'finaliz', 'listo', 'done'];
+function isDoneColumn(col){
+  if (!col) return false;
+  var n = col.name.toLowerCase();
+  return DONE_HINTS.some(function(h){ return n.indexOf(h) >= 0; });
+}
+
+/* Iconos SVG inline (línea, trazo 1.6px) para reemplazar caracteres emoji,
+   que varían de aspecto según el sistema operativo y no combinan con el
+   resto de la interfaz. Cada icono se dibuja en un viewBox de 16x16. */
+var ICON_PATHS = {
+  calendar: '<rect x="2" y="3.2" width="12" height="10.8" rx="1.6"/><path d="M2 6.4h12"/><path d="M5.2 1.8v2.6M10.8 1.8v2.6"/>',
+  clock: '<circle cx="8" cy="8.4" r="6"/><path d="M8 5v3.4l2.4 1.4"/>',
+  link: '<path d="M6.6 9.4a2.6 2.6 0 0 0 3.7 0l1.8-1.8a2.6 2.6 0 1 0-3.7-3.7L7.3 5"/><path d="M9.4 6.6a2.6 2.6 0 0 0-3.7 0L3.9 8.4a2.6 2.6 0 1 0 3.7 3.7l1.1-1.1"/>',
+  diamond: '<path d="M8 2.3 13.5 8 8 13.7 2.5 8Z"/>',
+  download: '<path d="M8 2.4v7.6M5 7l3 3 3-3"/><path d="M2.6 11.4V13a1 1 0 0 0 1 1h8.8a1 1 0 0 0 1-1v-1.6"/>',
+  upload: '<path d="M8 11.4V3.8M5 6.8l3-3 3 3"/><path d="M2.6 11.4V13a1 1 0 0 0 1 1h8.8a1 1 0 0 0 1-1v-1.6"/>',
+  pdf: '<path d="M4 1.8h5.6L12.4 4.6V13a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2.8a1 1 0 0 1 1-1Z"/><path d="M9.4 1.8V4.6h2.8"/><path d="M5 8.4h1.2a.9.9 0 1 1 0 1.8H5V7.6M9.6 10.2V7.6h1.3M9.6 8.8h1"/>',
+  mail: '<rect x="1.8" y="3.6" width="12.4" height="8.8" rx="1.3"/><path d="M2.2 4.2l5.8 4.6 5.8-4.6"/>',
+  zoomOut: '<circle cx="6.6" cy="6.6" r="4.8"/><path d="M13 13l-3-3"/><path d="M4.4 6.6h4.4"/>',
+  zoomIn: '<circle cx="6.6" cy="6.6" r="4.8"/><path d="M13 13l-3-3"/><path d="M6.6 4.4v4.4M4.4 6.6h4.4"/>',
+  table: '<rect x="1.8" y="2.6" width="12.4" height="10.8" rx="1.3"/><path d="M1.8 6.2h12.4"/><path d="M5.8 6.2v7.2M9.8 6.2v7.2"/>',
+  person: '<circle cx="8" cy="5.2" r="2.9"/><path d="M2.4 13.6c0-2.9 2.5-5.2 5.6-5.2s5.6 2.3 5.6 5.2"/>',
+  plus: '<path d="M8 3v10M3 8h10"/>',
+  cloud: '<path d="M4.6 12.4a3 3 0 0 1-.3-6 3.6 3.6 0 0 1 6.9-1.2A2.8 2.8 0 0 1 11.5 10.6"/><path d="M4.3 12.4h7.2a2.4 2.4 0 0 0 0-4.8h-.3"/>'
+};
+function svgIcon(name, extraStyle){
+  var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 16 16');
+  svg.setAttribute('class', 'icon-svg');
+  if (extraStyle) svg.setAttribute('style', extraStyle);
+  svg.innerHTML = ICON_PATHS[name] || '';
+  Array.prototype.forEach.call(svg.querySelectorAll('path,circle,rect'), function(node){
+    node.setAttribute('fill', 'none');
+    node.setAttribute('stroke', 'currentColor');
+    node.setAttribute('stroke-width', '1.6');
+    node.setAttribute('stroke-linecap', 'round');
+    node.setAttribute('stroke-linejoin', 'round');
+  });
+  return svg;
+}
+/* Construye un span "badge" con icono vectorial + texto, en vez de un
+   emoji dentro de un string — usado por todos los card-badge del Kanban. */
+function iconBadge(iconName, text, extraClass, title){
+  return el('span', { class:'card-badge' + (extraClass ? ' '+extraClass : ''), title: title||'' }, [
+    svgIcon(iconName), el('span', {}, [text])
+  ]);
+}
+
+
+/* ===================== Datos ===================== */
+function defaultData(){
+  var boardId = uid();
+  var col1 = uid(), col2 = uid(), col3 = uid();
+  var t = todayISO();
+  return {
+    boards: [{ id: boardId, name: 'Mis actividades' }],
+    columns: [
+      { id: col1, boardId: boardId, name: 'Por hacer', bg: COLUMN_PALETTE[0].bg, accent: COLUMN_PALETTE[0].accent, order: 0 },
+      { id: col2, boardId: boardId, name: 'En curso', bg: COLUMN_PALETTE[1].bg, accent: COLUMN_PALETTE[1].accent, order: 1 },
+      { id: col3, boardId: boardId, name: 'Hecho', bg: COLUMN_PALETTE[2].bg, accent: COLUMN_PALETTE[2].accent, order: 2 }
+    ],
+    cards: [
+      {
+        id: uid(), boardId: boardId, columnId: col1, order: 0,
+        type: 'task',
+        title: 'Bienvenido — arrastra esta tarjeta para probar',
+        description: 'Haz clic en una tarjeta para editar fechas, prioridad y tipo.',
+        priority: 'med', progress: 0,
+        startDate: t, dueDate: t,
+        dependencies: []
+      }
+    ],
+    activeBoard: boardId,
+    people: []
+  };
+}
+
+/* Migra datos de versiones anteriores (columnas con "color" plano en vez de
+   bg/accent, tarjetas con "labels" en vez de tipo/dependencias, y ausencia
+   del roster de personas) para que los archivos exportados antes de este
+   cambio se puedan seguir importando sin perder información ni romper el
+   render. */
+function migrateData(d){
+  if (!d || !d.columns) return d;
+  d.columns.forEach(function(col, i){
+    if (!col.bg || !col.accent){
+      var fallback = COLUMN_PALETTE[i % COLUMN_PALETTE.length];
+      col.accent = col.color || fallback.accent;
+      col.bg = fallback.bg;
+    }
+    delete col.color;
+  });
+  (d.cards || []).forEach(function(card){
+    if (!card.type) card.type = 'task';
+    if (!Array.isArray(card.dependencies)) card.dependencies = [];
+    delete card.labels;
+  });
+  if (!Array.isArray(d.people)) d.people = [];
+  return d;
+}
+
+/* Carga los datos del tablero desde el almacenamiento COMPARTIDO. Si la clave
+   no existe todavía (primera vez que alguien abre este artifact), window.storage
+   lanza una excepción en vez de devolver null — por eso el try/catch trata
+   "no encontrado" como "usar los datos por defecto", no como un error real. */
+/* Carga el estado desde el servidor propio (no window.storage: esta versión
+   corre como página web independiente con su propio backend). */
+async function loadData(){
+  try {
+    var res = await fetch('/api/data');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var body = await res.json();
+    STATE.lastKnownUpdatedAt = body.updatedAt;
+    if (!body.data || !body.data.boards || !body.data.boards.length) return defaultData();
+    return migrateData(body.data);
+  } catch (e) {
+    return defaultData();
+  }
+}
+
+/* Guarda hacia el servidor propio. Igual que en la versión de artifact:
+   puede fallar por red, así que el indicador visual de sincronización es
+   lo que informa el resultado en vez de asumir éxito silencioso. */
+async function saveData(data){
+  STATE.syncStatus = 'saving';
+  renderSyncIndicatorOnly();
+  try {
+    var res = await fetch('/api/data', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var body = await res.json();
+    STATE.lastKnownUpdatedAt = body.updatedAt;
+    STATE.syncStatus = 'saved';
+  } catch (e) {
+    console.error('No se pudo guardar en el servidor', e);
+    STATE.syncStatus = 'error';
+  }
+  renderSyncIndicatorOnly();
+}
+
+/* Polling: cada POLL_INTERVAL_MS se pregunta al servidor si hay una versión
+   más nueva que la que ya se tiene en pantalla. Si otra persona guardó algo
+   mientras tanto, se recarga el estado y se vuelve a dibujar. No se hace
+   mientras hay un modal de edición abierto, para no interrumpir a media
+   escritura ni pisar un cambio local sin guardar. */
+var POLL_INTERVAL_MS = 4000;
+function startPolling(){
+  setInterval(async function(){
+    var hasOpenEditor = STATE.modalCard || STATE.importModal || STATE.emailModal ||
+      STATE.peopleModal || STATE.newColumnPicker || STATE.recolorColumn || STATE.confirmDeleteCard || STATE.confirmDeleteBoard;
+    if (hasOpenEditor || STATE.loading || STATE.syncStatus === 'saving') return;
+    try {
+      var res = await fetch('/api/data');
+      if (!res.ok) return;
+      var body = await res.json();
+      if (body.updatedAt && body.updatedAt !== STATE.lastKnownUpdatedAt){
+        STATE.lastKnownUpdatedAt = body.updatedAt;
+        if (body.data && body.data.boards && body.data.boards.length){
+          STATE.data = migrateData(body.data);
+          render();
+        }
+      }
+    } catch (e) {
+      // Fallo silencioso del polling en sí (no del guardado): no queremos
+      // molestar con un error visible solo porque un chequeo de fondo
+      // falló una vez; el indicador de sync ya cubre los fallos de guardado.
+    }
+  }, POLL_INTERVAL_MS);
+}
+
+/* ===================== Exportar / Importar ===================== */
+function exportData(){
+  var payload = {
+    _taskboard_export: true,
+    _version: 1,
+    _exportedAt: new Date().toISOString(),
+    data: STATE.data
+  };
+  var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  var stamp = todayISO();
+  a.href = url;
+  a.download = 'taskboard-backup-' + stamp + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+}
+
+/* Escapa un valor para una celda CSV: si contiene coma, comilla o salto de
+   línea, se envuelve en comillas dobles y cualquier comilla interna se
+   duplica (regla estándar RFC 4180). */
+function csvEscape(value){
+  var s = (value === null || value === undefined) ? '' : String(value);
+  if (/[",\n\r]/.test(s)){
+    s = '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
+}
+
+/* Exporta una fila por actividad/hito, incluyendo tanto el ID técnico como
+   el nombre legible de cada relación (tablero, columna, prioridad, y las
+   dependencias). Pensado para abrir directo en Excel o importar a Power BI
+   sin tener que cruzar tablas primero — a diferencia del JSON de respaldo,
+   que solo guarda IDs y existe para reconstruir la app tal cual, no para
+   analizar datos. */
+function exportCsv(){
+  var board = activeBoard();
+  var columns = boardColumns(board.id);
+  var colById = {};
+  columns.forEach(function(c){ colById[c.id] = c; });
+  var cards = boardCards(board.id);
+  var cardById = {};
+  cards.forEach(function(c){ cardById[c.id] = c; });
+  var peopleById = {};
+  (STATE.data.people || []).forEach(function(p){ peopleById[p.id] = p; });
+
+  var headers = [
+    'id_actividad', 'nombre_actividad', 'tipo', 'tablero', 'id_columna', 'columna',
+    'prioridad', 'fecha_inicio', 'fecha_fin', 'duracion_dias', 'avance_pct', 'estado',
+    'id_responsable', 'responsable', 'rol_responsable',
+    'ids_dependencias', 'nombres_dependencias', 'descripcion'
+  ];
+
+  var rows = cards.slice().sort(function(a,b){ return (a.dueDate||'').localeCompare(b.dueDate||''); }).map(function(c){
+    var col = colById[c.columnId];
+    var isM = c.type === 'milestone';
+    var done = isDoneColumn(col);
+    var status = dueStatus(c.dueDate, done);
+    var statusLabel = done ? 'Terminada' : (status === 'overdue' ? 'Vencida' : (status === 'due-soon' ? 'Por vencer' : 'En curso'));
+    var priority = PRIORITIES.find(function(p){ return p.key === c.priority; });
+    var depIds = c.dependencies || [];
+    var depNames = depIds.map(function(id){ return cardById[id] ? cardById[id].title : '(eliminada)'; });
+    var assignee = c.assigneeId ? peopleById[c.assigneeId] : null;
+
+    return [
+      c.id,
+      c.title,
+      isM ? 'Hito' : 'Actividad',
+      board.name,
+      c.columnId,
+      col ? col.name : '',
+      priority ? priority.label : '',
+      isM ? '' : c.startDate,
+      c.dueDate,
+      isM ? '' : (durationDays(c.startDate, c.dueDate) || ''),
+      isM ? (c.progress >= 100 ? 100 : 0) : Math.round(c.progress),
+      statusLabel,
+      c.assigneeId || '',
+      assignee ? assignee.name : '',
+      assignee ? assignee.role : '',
+      depIds.join(' | '),
+      depNames.join(' | '),
+      c.description || ''
+    ];
+  });
+
+  var lines = [headers.join(',')];
+  rows.forEach(function(row){ lines.push(row.map(csvEscape).join(',')); });
+  // BOM UTF-8 al inicio para que Excel detecte tildes/ñ correctamente al abrir el CSV
+  var csvContent = '\uFEFF' + lines.join('\r\n');
+
+  var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'taskboard-' + slugify(board.name) + '-' + todayISO() + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+}
+
+function importDataFromFile(file, onDone){
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try {
+      var parsed = JSON.parse(e.target.result);
+      var incoming = parsed && parsed._taskboard_export ? parsed.data : parsed;
+      if (!incoming || !incoming.boards || !incoming.columns || !incoming.cards) {
+        onDone(false, 'El archivo no tiene el formato esperado de TaskBoard.');
+        return;
+      }
+      onDone(true, null, incoming);
+    } catch (err) {
+      onDone(false, 'No se pudo leer el archivo. ¿Es un .json válido exportado desde TaskBoard?');
+    }
+  };
+  reader.onerror = function(){ onDone(false, 'No se pudo abrir el archivo.'); };
+  reader.readAsText(file);
+}
+
+/* Genera el asunto y cuerpo de un correo con el resumen del tablero activo:
+   estadísticas generales (igual que el panel de indicadores) y el detalle de
+   cada actividad con su estado y % de avance individual. Texto plano, para
+   máxima compatibilidad con cualquier cliente de correo. */
+function buildStatusEmailContent(){
+  var board = activeBoard();
+  var stats = computeStats();
+  var columns = boardColumns(board.id);
+  var colById = {};
+  columns.forEach(function(c){ colById[c.id] = c; });
+  var cards = boardCards(board.id).slice().sort(function(a,b){
+    return (a.dueDate||'').localeCompare(b.dueDate||'');
+  });
+
+  var subject = 'Resumen de actividades — ' + board.name + ' (' + fmtShort(todayISO()) + ')';
+
+  var lines = [];
+  lines.push('Resumen del tablero: ' + board.name);
+  lines.push('Fecha: ' + new Date().toLocaleDateString('es-ES', { day:'numeric', month:'long', year:'numeric' }));
+  lines.push('');
+  lines.push('— Resumen general —');
+  lines.push('Total de actividades: ' + stats.total);
+  lines.push('Pendientes: ' + stats.pending);
+  lines.push('En curso: ' + stats.inProgress);
+  lines.push('Terminadas: ' + stats.done);
+  lines.push('Por vencer (2 días o menos): ' + stats.dueSoon);
+  lines.push('Vencidas: ' + stats.overdue);
+  lines.push('Avance promedio: ' + stats.avgProgress + '%');
+  lines.push('');
+  lines.push('— Detalle por actividad —');
+  if (cards.length === 0){
+    lines.push('(No hay actividades registradas todavía.)');
+  }
+  cards.forEach(function(c){
+    var col = colById[c.columnId];
+    var isM = c.type === 'milestone';
+    var done = isDoneColumn(col);
+    var status = dueStatus(c.dueDate, done);
+    var statusLabel = done ? 'Terminada' : (status === 'overdue' ? 'VENCIDA' : (status === 'due-soon' ? 'Por vencer' : 'En curso'));
+    var pctLabel = isM ? (c.progress >= 100 ? '100%' : '0%') : (Math.round(c.progress) + '%');
+    var dateLabel = isM ? ('Hito — ' + fmtShort(c.dueDate)) : ('Vence ' + fmtShort(c.dueDate));
+    lines.push('• ' + c.title + ' — ' + (col ? col.name : 'Sin columna') + ' — ' + statusLabel + ' — ' + pctLabel + ' — ' + dateLabel);
+  });
+  lines.push('');
+  lines.push('Generado automáticamente por TaskBoard.');
+
+  return { subject: subject, body: lines.join('\n') };
+}
+
+/* Abre el cliente de correo del usuario con destinatarios, asunto y cuerpo
+   ya redactados, vía un enlace mailto:. No hay forma de enviar un correo real
+   desde un archivo HTML sin depender de un servicio externo con credenciales
+   propias — mailto: es la opción que funciona sin ninguna configuración ni
+   cuenta de terceros, a cambio de requerir que el usuario presione Enviar en
+   su propio cliente de correo. */
+function sendStatusEmail(recipients){
+  var content = buildStatusEmailContent();
+  var to = (recipients || []).join(',');
+  var url = 'mailto:' + encodeURIComponent(to).replace(/%2C/g, ',') +
+    '?subject=' + encodeURIComponent(content.subject) +
+    '&body=' + encodeURIComponent(content.body);
+  // Los enlaces mailto: tienen un límite práctico de longitud en algunos
+  // clientes (~2000 caracteres); si el cuerpo es muy largo, se recorta con
+  // aviso en vez de fallar silenciosamente al abrir el cliente de correo.
+  if (url.length > 1800){
+    var trimmedBody = content.body.slice(0, 1200) + '\n\n[...resumen recortado por longitud; usa Exportar PDF para el detalle completo...]';
+    url = 'mailto:' + encodeURIComponent(to).replace(/%2C/g, ',') +
+      '?subject=' + encodeURIComponent(content.subject) +
+      '&body=' + encodeURIComponent(trimmedBody);
+  }
+  window.location.href = url;
+}
+
+/* Abre el cliente de correo del usuario con un aviso puntual dirigido al
+   responsable de UNA actividad específica (a diferencia de sendStatusEmail,
+   que manda el resumen de todo el tablero). Mismo mecanismo mailto: — no hay
+   envío automático real posible sin un backend o un servicio de correo de
+   terceros con credenciales propias. */
+function notifyAssigneeByEmail(person, activityInfo){
+  var priority = PRIORITIES.find(function(p){ return p.key === activityInfo.priority; });
+  var isM = activityInfo.type === 'milestone';
+  var subject = 'Te asignaron: ' + activityInfo.title;
+  var lines = [
+    'Hola ' + person.name + ',',
+    '',
+    'Se te asignó como responsable de ' + (isM ? 'el hito' : 'la actividad') + ':',
+    '',
+    '• ' + activityInfo.title,
+    '  ' + (isM ? 'Fecha: ' : 'Fecha límite: ') + (activityInfo.dueDate ? fmtShort(activityInfo.dueDate) : 'sin definir'),
+    '  Prioridad: ' + (priority ? priority.label : 'sin definir'),
+  ];
+  if (!isM) lines.push('  Avance actual: ' + Math.round(activityInfo.progress) + '%');
+  lines.push('', 'Generado automáticamente por TaskBoard.');
+
+  var url = 'mailto:' + encodeURIComponent(person.email) +
+    '?subject=' + encodeURIComponent(subject) +
+    '&body=' + encodeURIComponent(lines.join('\n'));
+  window.location.href = url;
+}
+
+/* Exportar a PDF: se arma una vista "documento" oculta (portada + tabla de
+   actividades + una copia del Gantt tal como se ve en pantalla) y se dispara
+   window.print(). El navegador ofrece "Guardar como PDF" en el propio diálogo
+   de impresión — es la única forma de producir un PDF real sin depender de
+   una librería externa ni de un servicio en la nube, y funciona sin conexión. */
+function exportPdfSnapshot(){
+  var board = activeBoard();
+  var cards = boardCards(board.id).slice().sort(function(a,b){
+    return (a.dueDate||'').localeCompare(b.dueDate||'');
+  });
+  var columns = boardColumns(board.id);
+  var colById = {};
+  columns.forEach(function(c){ colById[c.id] = c; });
+  var stats = computeStats();
+
+  var old = document.getElementById('pdf-snapshot');
+  if (old) old.remove();
+
+  var container = el('div', { id:'pdf-snapshot' });
+
+  // Portada
+  var cover = el('div', { class:'pdf-page pdf-cover' }, [
+    el('div', { class:'pdf-cover-mark' }, ['TB']),
+    el('h1', {}, ['TaskBoard']),
+    el('h2', {}, [board.name]),
+    el('p', {}, ['Instantánea generada el ' + new Date().toLocaleDateString('es-ES', { day:'numeric', month:'long', year:'numeric' }) + ' a las ' + new Date().toLocaleTimeString('es-ES', { hour:'2-digit', minute:'2-digit' })]),
+    el('div', { class:'pdf-cover-stats' }, [
+      el('div', {}, [el('strong', {}, [String(stats.total)]), ' actividades totales']),
+      el('div', {}, [el('strong', {}, [String(stats.avgProgress) + '%']), ' avance promedio']),
+      el('div', {}, [el('strong', {}, [String(stats.overdue)]), ' vencidas']),
+    ])
+  ]);
+  container.appendChild(cover);
+
+  // Tabla de actividades
+  var tablePage = el('div', { class:'pdf-page' });
+  tablePage.appendChild(el('h2', { class:'pdf-section-title' }, ['Listado de actividades']));
+  var table = el('table', { class:'pdf-table' });
+  var thead = el('tr', {}, [
+    el('th', {}, ['Tipo']), el('th', {}, ['Título']), el('th', {}, ['Columna']),
+    el('th', {}, ['Prioridad']), el('th', {}, ['Inicio']), el('th', {}, ['Fin']),
+    el('th', {}, ['Duración']), el('th', {}, ['Avance'])
+  ]);
+  table.appendChild(thead);
+  cards.forEach(function(c){
+    var col = colById[c.columnId];
+    var pr = PRIORITIES.find(function(p){ return p.key === c.priority; });
+    var isM = c.type === 'milestone';
+    table.appendChild(el('tr', {}, [
+      el('td', {}, [isM ? 'Hito' : 'Actividad']),
+      el('td', {}, [c.title]),
+      el('td', {}, [col ? col.name : '—']),
+      el('td', {}, [pr ? pr.label : '—']),
+      el('td', {}, [isM ? '—' : fmtShort(c.startDate)]),
+      el('td', {}, [fmtShort(c.dueDate)]),
+      el('td', {}, [isM ? '—' : fmtDuration(c.startDate, c.dueDate)]),
+      el('td', {}, [isM ? (c.progress>=100?'Cumplido':'Pendiente') : (c.progress + '%')])
+    ]));
+  });
+  tablePage.appendChild(table);
+  container.appendChild(tablePage);
+
+  // Cronograma: clon en vivo del Gantt tal como está renderizado en pantalla
+  var ganttPage = el('div', { class:'pdf-page pdf-gantt-page' });
+  ganttPage.appendChild(el('h2', { class:'pdf-section-title' }, ['Cronograma']));
+  var liveGantt = document.querySelector('.gantt-wrap');
+  if (liveGantt){
+    var clone = liveGantt.cloneNode(true);
+    clone.style.overflow = 'visible';
+    clone.style.height = 'auto';
+    clone.querySelectorAll('.gantt-scroll').forEach(function(n){ n.style.overflow = 'visible'; });
+    ganttPage.appendChild(clone);
+  } else {
+    ganttPage.appendChild(el('p', {}, ['No hay actividades con fecha para mostrar en el cronograma.']));
+  }
+  container.appendChild(ganttPage);
+
+  document.body.appendChild(container);
+  var suggestedName = 'taskboard-' + slugify(board.name) + '-' + todayISO();
+  var prevTitle = document.title;
+  document.title = suggestedName;
+
+  function cleanup(){
+    document.title = prevTitle;
+    var el2 = document.getElementById('pdf-snapshot');
+    if (el2) el2.remove();
+    window.removeEventListener('afterprint', cleanup);
+  }
+  window.addEventListener('afterprint', cleanup);
+  setTimeout(function(){
+    window.print();
+    // Salvaguarda por si el navegador no dispara afterprint (algunos móviles)
+    setTimeout(cleanup, 4000);
+  }, 50);
+}
+function slugify(s){
+  return (s||'tablero').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'') || 'tablero';
+}
+var STATE = {
+  data: null, // null hasta que loadData() termine de traer los datos compartidos
+  loading: true,
+  loadError: false,
+  syncStatus: 'saved', // 'saved' | 'saving' | 'error'
+  modalCard: null,
+  confirmDeleteBoard: null,
+  confirmDeleteCard: null,
+  importModal: false,
+  importError: null,
+  dragCardId: null,
+  kanbanHeightPct: 46,
+  newColumnPicker: false,
+  recolorColumn: null,
+  ganttDrag: null,
+  emailModal: false,
+  ganttZoom: 1,
+  ganttDragCardId: null,
+  ganttSidebarWidth: 230,
+  peopleModal: false
+};
+
+/* setState() sigue siendo síncrono para la parte visual: la interfaz
+   reacciona al instante usando lo que ya está en memoria (STATE.data), sin
+   esperar a la red. El guardado hacia el almacenamiento compartido ocurre
+   en segundo plano (saveData es async) — así una persona no siente demora
+   al escribir o arrastrar algo, aunque el guardado real tome unos
+   milisegundos más en llegar al servidor compartido. */
+function setState(patch){
+  Object.assign(STATE, patch);
+  if (patch.data) saveData(STATE.data); // fire-and-forget intencional
+  render();
+}
+
+/* Arranque de la app: carga los datos compartidos una sola vez y entonces
+   hace el primer render real. Mientras tanto se muestra una pantalla de
+   carga simple (ver render()). Tras cargar con éxito, arranca el polling
+   que detecta cambios guardados por otras personas. */
+async function initApp(){
+  try {
+    STATE.data = await loadData();
+    startPolling();
+  } catch (e) {
+    STATE.loadError = true;
+  }
+  STATE.loading = false;
+  render();
+}
+
+function activeBoard(){
+  return STATE.data.boards.find(function(b){ return b.id === STATE.data.activeBoard; }) || STATE.data.boards[0];
+}
+function boardColumns(boardId){
+  return STATE.data.columns.filter(function(c){ return c.boardId === boardId; }).sort(function(a,b){ return a.order - b.order; });
+}
+function boardCards(boardId){
+  return STATE.data.cards.filter(function(c){ return c.boardId === boardId; });
+}
+function filteredCards(){
+  return boardCards(activeBoard().id);
+}
+
+/* ---------- Acciones de tablero ---------- */
+function addBoard(){
+  var name = prompt('Nombre del nuevo tablero:');
+  if (!name || !name.trim()) return;
+  var id = uid();
+  var c1 = uid(), c2 = uid(), c3 = uid();
+  var d = STATE.data;
+  d.boards.push({ id: id, name: name.trim() });
+  d.columns.push(
+    { id: c1, boardId: id, name: 'Por hacer', bg: COLUMN_PALETTE[0].bg, accent: COLUMN_PALETTE[0].accent, order: 0 },
+    { id: c2, boardId: id, name: 'En curso', bg: COLUMN_PALETTE[1].bg, accent: COLUMN_PALETTE[1].accent, order: 1 },
+    { id: c3, boardId: id, name: 'Hecho', bg: COLUMN_PALETTE[2].bg, accent: COLUMN_PALETTE[2].accent, order: 2 }
+  );
+  d.activeBoard = id;
+  setState({ data: d });
+}
+function deleteBoard(boardId){
+  var d = STATE.data;
+  var boards = d.boards.filter(function(b){ return b.id !== boardId; });
+  if (boards.length === 0) return;
+  d.boards = boards;
+  d.columns = d.columns.filter(function(c){ return c.boardId !== boardId; });
+  d.cards = d.cards.filter(function(c){ return c.boardId !== boardId; });
+  if (d.activeBoard === boardId) d.activeBoard = boards[0].id;
+  setState({ data: d, confirmDeleteBoard: null });
+}
+
+/* ---------- Roster de personas (global, compartido entre todos los tableros) ----------
+   No hay límite de cantidad: es un arreglo que crece libremente. */
+function addPerson(name, role, email){
+  name = (name || '').trim();
+  if (!name) return null;
+  var d = STATE.data;
+  if (!Array.isArray(d.people)) d.people = [];
+  var person = { id: uid(), name: name, role: (role||'').trim(), email: (email||'').trim() };
+  d.people.push(person);
+  setState({ data: d });
+  return person.id;
+}
+/* Igual que addPerson, pero sin disparar setState()/render(). Se usa dentro
+   del modal de tarjeta: si añadir una persona disparara un render completo,
+   el modal de tarjeta se reconstruiría desde sus datos originales y se
+   perdería cualquier cambio sin guardar (título, descripción, etc.) que el
+   usuario ya hubiera escrito. Aquí solo se muta STATE.data y se persiste a
+   disco; quien llama actualiza el <select> localmente por su cuenta. */
+function addPersonQuiet(name, role, email){
+  name = (name || '').trim();
+  if (!name) return null;
+  var d = STATE.data;
+  if (!Array.isArray(d.people)) d.people = [];
+  var person = { id: uid(), name: name, role: (role||'').trim(), email: (email||'').trim() };
+  d.people.push(person);
+  saveData(d);
+  return person.id;
+}
+function updatePerson(personId, patch){
+  var d = STATE.data;
+  var person = (d.people||[]).find(function(p){ return p.id === personId; });
+  if (!person) return;
+  Object.assign(person, patch);
+  setState({ data: d });
+}
+function deletePerson(personId){
+  var d = STATE.data;
+  d.people = (d.people||[]).filter(function(p){ return p.id !== personId; });
+  // Las tarjetas que tenían a esta persona como responsable quedan sin asignar,
+  // en vez de arrastrar una referencia a un ID que ya no existe.
+  d.cards.forEach(function(c){ if (c.assigneeId === personId) c.assigneeId = null; });
+  setState({ data: d });
+}
+
+/* ---------- Acciones de columna ---------- */
+function addColumn(){
+  setState({ newColumnPicker: true });
+}
+function confirmAddColumn(paletteIndex){
+  var d = STATE.data;
+  var cols = boardColumns(activeBoard().id);
+  var p = COLUMN_PALETTE[paletteIndex] || COLUMN_PALETTE[cols.length % COLUMN_PALETTE.length];
+  d.columns.push({ id: uid(), boardId: activeBoard().id, name: 'Nueva columna', bg: p.bg, accent: p.accent, order: cols.length });
+  setState({ data: d, newColumnPicker: false });
+}
+/* Actualiza el nombre en memoria SIN disparar render() en cada tecla — un
+   render completo reconstruye el DOM y el input pierde el foco a mitad de
+   escritura (bug real: "hay que hacer click por cada letra"). Se persiste
+   a disco recién cuando el campo pierde el foco o el usuario presiona Enter. */
+function renameColumnLive(colId, name){
+  var col = STATE.data.columns.find(function(c){ return c.id === colId; });
+  if (col) col.name = name;
+}
+function commitRenameColumn(){
+  saveData(STATE.data);
+}
+function deleteColumn(colId){
+  var d = STATE.data;
+  var cardIdsInCol = d.cards.filter(function(c){ return c.columnId === colId; }).map(function(c){ return c.id; });
+  var outsideDependents = d.cards.filter(function(c){
+    return c.columnId !== colId && Array.isArray(c.dependencies) && c.dependencies.some(function(dep){ return cardIdsInCol.indexOf(dep) >= 0; });
+  });
+  var msg = '¿Eliminar esta columna y todas sus tarjetas?';
+  if (outsideDependents.length > 0){
+    msg += '\n\nAviso: ' + outsideDependents.length + ' actividad(es) fuera de esta columna dependen de tarjetas que se eliminarán. Esas relaciones se romperán.';
+  }
+  if (!confirm(msg)) return;
+  d.columns = d.columns.filter(function(c){ return c.id !== colId; });
+  d.cards = d.cards.filter(function(c){ return c.columnId !== colId; });
+  d.cards.forEach(function(c){
+    if (Array.isArray(c.dependencies)) c.dependencies = c.dependencies.filter(function(dep){ return cardIdsInCol.indexOf(dep) < 0; });
+  });
+  setState({ data: d });
+}
+
+/* ---------- Acciones de tarjeta ---------- */
+function upsertCard(card){
+  var d = STATE.data;
+  var idx = d.cards.findIndex(function(c){ return c.id === card.id; });
+  if (idx >= 0) d.cards[idx] = card;
+  else d.cards.push(card);
+  setState({ data: d, modalCard: null });
+}
+
+/* Tarjetas que declaran cardId como una de sus dependencias */
+function dependentsOf(cardId){
+  return STATE.data.cards.filter(function(c){
+    return Array.isArray(c.dependencies) && c.dependencies.indexOf(cardId) >= 0;
+  });
+}
+
+function deleteCard(cardId){
+  var dependents = dependentsOf(cardId);
+  if (dependents.length > 0){
+    setState({ confirmDeleteCard: cardId, modalCard: null });
+    return;
+  }
+  forceDeleteCard(cardId);
+}
+function forceDeleteCard(cardId){
+  var d = STATE.data;
+  d.cards = d.cards.filter(function(c){ return c.id !== cardId; });
+  // Limpia la referencia en cualquier tarjeta que dependiera de esta
+  d.cards.forEach(function(c){
+    if (Array.isArray(c.dependencies)){
+      c.dependencies = c.dependencies.filter(function(dep){ return dep !== cardId; });
+    }
+  });
+  setState({ data: d, modalCard: null, confirmDeleteCard: null });
+}
+function moveCard(cardId, toColumnId, toIndex){
+  var d = STATE.data;
+  var card = d.cards.find(function(c){ return c.id === cardId; });
+  if (!card) return;
+  var others = d.cards.filter(function(c){ return c.id !== cardId; });
+  var inTarget = others.filter(function(c){ return c.columnId === toColumnId; }).sort(function(a,b){ return a.order - b.order; });
+  var moved = Object.assign({}, card, { columnId: toColumnId });
+  inTarget.splice(toIndex, 0, moved);
+  inTarget.forEach(function(c, i){ c.order = i; });
+  var rest = others.filter(function(c){ return c.columnId !== toColumnId; });
+  d.cards = rest.concat(inTarget);
+  setState({ data: d });
+}
+/* ===================== Render raíz ===================== */
+function render(){
+  var app = document.getElementById('app');
+  app.innerHTML = '';
+
+  if (STATE.loading){
+    app.appendChild(renderLoadingScreen());
+    return;
+  }
+  if (STATE.loadError || !STATE.data){
+    app.appendChild(renderLoadErrorScreen());
+    return;
+  }
+
+  app.appendChild(renderTopBar());
+
+  var layout = el('div', { class:'layout' });
+  var workspace = el('div', { class:'workspace' });
+
+  workspace.appendChild(renderKanbanSection());
+  workspace.appendChild(renderResizeHandle());
+  workspace.appendChild(renderGanttSection());
+
+  layout.appendChild(workspace);
+  layout.appendChild(renderStatsSidebar());
+  app.appendChild(layout);
+
+  if (STATE.modalCard) app.appendChild(renderCardModal(STATE.modalCard));
+  if (STATE.confirmDeleteBoard) app.appendChild(renderConfirmModal());
+  if (STATE.confirmDeleteCard) app.appendChild(renderConfirmDeleteCardModal());
+  if (STATE.importModal) app.appendChild(renderImportModal());
+  if (STATE.newColumnPicker) app.appendChild(renderColumnColorPicker());
+  if (STATE.recolorColumn) app.appendChild(renderColumnColorPicker(STATE.recolorColumn));
+  if (STATE.emailModal) app.appendChild(renderEmailModal());
+  if (STATE.peopleModal) app.appendChild(renderPeopleModal());
+}
+
+function renderLoadingScreen(){
+  return el('div', { style:'height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text-dim)' }, [
+    el('div', { class:'loading-spinner' }),
+    el('div', { style:'font-size:13px' }, ['Cargando el tablero compartido...'])
+  ]);
+}
+function renderLoadErrorScreen(){
+  var box = el('div', { style:'height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:var(--text-dim);padding:40px;text-align:center' }, [
+    el('div', { style:'font-size:15px;font-weight:600;color:var(--text)' }, ['No se pudo cargar el tablero compartido']),
+    el('div', { style:'font-size:13px;max-width:380px;line-height:1.5' }, [
+      'Puede ser un problema de conexión temporal. Intenta recargar la página.'
+    ]),
+    el('button', { class:'btn btn-accent', onclick:function(){ STATE.loading = true; STATE.loadError = false; render(); initApp(); } }, ['Reintentar'])
+  ]);
+  return box;
+}
+
+/* Vuelve a dibujar SOLO el indicador de sincronización del topbar (si ya
+   existe en el DOM), sin pasar por render() completo — evita que un guardado
+   en curso reconstruya toda la interfaz mientras la persona sigue escribiendo
+   en algún campo abierto en ese momento. */
+function renderSyncIndicatorOnly(){
+  var el2 = document.getElementById('sync-indicator');
+  if (!el2) return;
+  var fresh = buildSyncIndicator();
+  el2.replaceWith(fresh);
+}
+
+/* ===================== Topbar ===================== */
+/* Construye el indicador de estado de guardado + el aviso de que este
+   tablero es compartido. Vive en un elemento con id fijo (#sync-indicator)
+   para que renderSyncIndicatorOnly() pueda reemplazarlo sin re-renderizar
+   el resto de la interfaz mientras el guardado está en curso. */
+function buildSyncIndicator(){
+  var statusMap = {
+    saved:  { label:'Guardado',   cls:'sync-ok' },
+    saving: { label:'Guardando…', cls:'sync-busy' },
+    error:  { label:'Sin guardar — revisa tu conexión', cls:'sync-error' }
+  };
+  var s = statusMap[STATE.syncStatus] || statusMap.saved;
+  return el('div', { id:'sync-indicator', class:'sync-indicator', title:'Este tablero es compartido: todas las personas con este enlace ven y editan los mismos datos.' }, [
+    svgIcon('cloud'),
+    el('span', { class:s.cls }, [s.label])
+  ]);
+}
+
+function renderTopBar(){
+  var bar = el('div', { class:'topbar' });
+  bar.appendChild(el('div', { class:'brand' }, [
+    el('span', { class:'mark' }, ['TB']), 'TaskBoard'
+  ]));
+
+  var tabs = el('div', { class:'board-tabs' });
+  STATE.data.boards.forEach(function(b){
+    var tab = el('button', {
+      class:'board-tab' + (b.id === activeBoard().id ? ' active' : ''),
+      onclick:function(){ STATE.data.activeBoard = b.id; setState({ data: STATE.data }); }
+    }, [b.name]);
+    if (STATE.data.boards.length > 1){
+      tab.appendChild(el('span', {
+        class:'del',
+        onclick:function(e){ e.stopPropagation(); setState({ confirmDeleteBoard: b.id }); }
+      }, ['✕']));
+    }
+    tabs.appendChild(tab);
+  });
+  tabs.appendChild(el('button', { class:'btn btn-ghost btn-sm', onclick:addBoard }, ['+ Tablero']));
+  bar.appendChild(tabs);
+
+  bar.appendChild(buildSyncIndicator());
+
+  var actions = el('div', { class:'topbar-actions' });
+  actions.appendChild(el('button', { class:'btn btn-sm', title:'Gestionar las personas del equipo y sus roles', onclick:function(){ setState({ peopleModal:true }); } }, [svgIcon('person'), 'Equipo']));
+  actions.appendChild(el('button', { class:'btn btn-sm', title:'Descargar una copia de tus datos (para re-importar en TaskBoard)', onclick:exportData }, [svgIcon('download'), 'Exportar']));
+  actions.appendChild(el('button', { class:'btn btn-sm', title:'Descargar en CSV para Excel o Power BI', onclick:exportCsv }, [svgIcon('table'), 'Exportar CSV']));
+  actions.appendChild(el('button', { class:'btn btn-sm', title:'Cargar datos desde un archivo exportado', onclick:function(){ setState({ importModal:true, importError:null }); } }, [svgIcon('upload'), 'Importar']));
+  actions.appendChild(el('button', { class:'btn btn-sm', title:'Descargar un PDF con el resumen y el cronograma', onclick:exportPdfSnapshot }, [svgIcon('pdf'), 'Exportar PDF']));
+  actions.appendChild(el('button', { class:'btn btn-sm', title:'Enviar un resumen del tablero por correo', onclick:function(){ setState({ emailModal:true }); } }, [svgIcon('mail'), 'Enviar resumen']));
+  bar.appendChild(actions);
+
+  return bar;
+}
+
+/* ===================== Sección Kanban ===================== */
+function renderKanbanSection(){
+  var section = el('div', { class:'panel-section kanban-section', style:'height:' + STATE.kanbanHeightPct + '%' });
+  section.appendChild(el('div', { class:'panel-heading' }, ['Tablero', el('span', { class:'line' })]));
+  section.appendChild(renderKanban());
+  return section;
+}
+
+function renderResizeHandle(){
+  var handle = el('div', { class:'resize-handle' });
+  handle.addEventListener('mousedown', function(e){
+    e.preventDefault();
+    handle.classList.add('active');
+    var layout = document.querySelector('.layout');
+    function onMove(ev){
+      var workspace = document.querySelector('.workspace');
+      var rect = workspace.getBoundingClientRect();
+      var pct = ((ev.clientY - rect.top) / rect.height) * 100;
+      pct = Math.max(20, Math.min(75, pct));
+      setState({ kanbanHeightPct: pct });
+    }
+    function onUp(){
+      handle.classList.remove('active');
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+  return handle;
+}
+
+function renderKanban(){
+  var columns = boardColumns(activeBoard().id);
+  var cards = filteredCards();
+
+  if (columns.length === 0){
+    return el('div', { class:'empty-state' }, [
+      el('div', { class:'big' }, ['Este tablero no tiene columnas']),
+      el('div', { class:'small' }, ['Crea tu primera columna para empezar a organizar tus actividades.']),
+      el('button', { class:'btn btn-accent', style:'margin-top:8px', onclick:addColumn }, ['+ Crear columna'])
+    ]);
+  }
+
+  var wrap = el('div', { class:'kanban-wrap' });
+  var kanban = el('div', { class:'kanban' });
+
+  columns.forEach(function(col){
+    var colCards = cards.filter(function(c){ return c.columnId === col.id; }).sort(function(a,b){ return a.order-b.order; });
+    var colWidth = col.width || 272;
+    var colEl = el('div', {
+      class:'column',
+      style:'background:'+col.bg+';border-color:'+shadeColor(col.accent,0.35)+';width:'+colWidth+'px;min-width:'+colWidth+'px'
+    });
+    colEl.addEventListener('dragover', function(e){ e.preventDefault(); colEl.classList.add('drag-over'); });
+    colEl.addEventListener('dragleave', function(){ colEl.classList.remove('drag-over'); });
+    colEl.addEventListener('drop', function(e){
+      e.preventDefault(); colEl.classList.remove('drag-over');
+      if (STATE.dragCardId) moveCard(STATE.dragCardId, col.id, colCards.length);
+    });
+
+    var head = el('div', { class:'column-head' }, [
+      el('span', { class:'col-color', style:'background:' + col.accent, title:'Cambiar color', onclick:function(){ setState({ recolorColumn: col.id }); } }),
+      el('input', {
+        class:'column-title', value: col.name,
+        oninput:function(e){ renameColumnLive(col.id, e.target.value); },
+        onblur:commitRenameColumn,
+        onkeydown:function(e){ if (e.key === 'Enter') e.target.blur(); }
+      }),
+    ]);
+    head.appendChild(el('span', { class:'column-count' }, [String(colCards.length)]));
+    head.appendChild(el('button', { class:'column-menu-btn', title:'Eliminar columna', onclick:function(){ deleteColumn(col.id); } }, ['✕']));
+    colEl.appendChild(head);
+
+    var body = el('div', { class:'column-body' });
+    colCards.forEach(function(card, i){
+      var cardWrap = el('div', { draggable:'true' });
+      cardWrap.addEventListener('dragstart', function(){ STATE.dragCardId = card.id; cardWrap.classList.add('dragging'); });
+      cardWrap.addEventListener('dragend', function(){ STATE.dragCardId = null; });
+      cardWrap.addEventListener('dragover', function(e){ e.preventDefault(); e.stopPropagation(); });
+      cardWrap.addEventListener('drop', function(e){
+        e.preventDefault(); e.stopPropagation();
+        if (STATE.dragCardId) moveCard(STATE.dragCardId, col.id, i);
+      });
+      cardWrap.appendChild(renderCard(card, isDoneColumn(col)));
+      body.appendChild(cardWrap);
+    });
+    body.appendChild(el('button', { class:'add-card-btn', onclick:function(){ setState({ modalCard: { id:null, columnId: col.id } }); } }, ['+ Añadir tarjeta']));
+    colEl.appendChild(body);
+
+    var colResizeHandle = el('div', { class:'column-resize-handle' });
+    attachColumnResizeDrag(colResizeHandle, col, colEl);
+    colEl.appendChild(colResizeHandle);
+
+    kanban.appendChild(colEl);
+  });
+
+  kanban.appendChild(el('button', { class:'add-column', onclick:addColumn }, ['+ Añadir columna']));
+  wrap.appendChild(kanban);
+  return wrap;
+}
+
+/* Arrastre del borde derecho de una columna para hacerla más ancha o angosta.
+   Igual que el resize del divisor Kanban/Gantt: se muta el ancho directamente
+   sobre el elemento durante el gesto (fluidez inmediata, sin re-renderizar
+   toda la app en cada mousemove) y solo se persiste el valor final al soltar. */
+function attachColumnResizeDrag(handle, col, colEl){
+  handle.addEventListener('mousedown', function(e){
+    e.preventDefault();
+    e.stopPropagation();
+    handle.classList.add('active');
+    var startX = e.clientX;
+    var startWidth = col.width || 272;
+    function onMove(ev){
+      var newWidth = Math.max(220, Math.min(920, startWidth + (ev.clientX - startX)));
+      colEl.style.width = newWidth + 'px';
+      colEl.style.minWidth = newWidth + 'px';
+    }
+    function onUp(){
+      handle.classList.remove('active');
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      var finalWidth = parseInt(colEl.style.width, 10);
+      var d = STATE.data;
+      var liveCol = d.columns.find(function(c){ return c.id === col.id; });
+      if (liveCol) liveCol.width = finalWidth;
+      saveData(d);
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+  return handle;
+}
+
+function renderCard(card, done){
+  var isMilestone = card.type === 'milestone';
+  var status = dueStatus(card.dueDate, done);
+  var priority = PRIORITIES.find(function(p){ return p.key === card.priority; });
+  // El fondo de la tarjeta siempre es sólido (nunca se tiñe con el color de
+  // prioridad), para que no se mezcle visualmente con el fondo pastel de la
+  // columna que la contiene. La prioridad se indica con un borde lateral.
+  var priorityBorder = (priority && !done) ? ('border-left:3px solid '+priority.color) : '';
+  var cardEl = el('div', {
+    class:'card' + (isMilestone ? ' card-milestone' : ''),
+    style: priorityBorder,
+    onclick:function(){ setState({ modalCard: card }); }
+  });
+
+  var titleRow = el('div', { class:'card-title-row' });
+  if (isMilestone){
+    titleRow.appendChild(el('span', { class:'milestone-diamond', style:'background:'+(priority?priority.color:'var(--text-dim)'), title:'Hito' }));
+  }
+  titleRow.appendChild(el('div', { class:'card-title' }, [card.title]));
+  if (card.assigneeId){
+    var assignee = (STATE.data.people || []).find(function(p){ return p.id === card.assigneeId; });
+    if (assignee){
+      titleRow.appendChild(el('span', {
+        class:'card-avatar', title:'Responsable: ' + assignee.name + (assignee.role ? ' — ' + assignee.role : '')
+      }, [(assignee.name.trim()[0] || '?').toUpperCase()]));
+    }
+  }
+  cardEl.appendChild(titleRow);
+
+  var meta = el('div', { class:'card-meta' });
+  if (priority) meta.appendChild(el('span', { class:'card-priority', style:'background:'+priority.color, title:'Prioridad '+priority.label }));
+  if (isMilestone){
+    if (card.dueDate){
+      meta.appendChild(iconBadge('diamond', fmtShort(card.dueDate), status));
+    }
+  } else {
+    if (card.dueDate){
+      meta.appendChild(iconBadge('calendar', fmtShort(card.dueDate), status));
+    }
+    var dur = fmtDuration(card.startDate, card.dueDate);
+    if (dur){
+      meta.appendChild(iconBadge('clock', dur));
+    }
+  }
+  if (card.dependencies && card.dependencies.length){
+    meta.appendChild(iconBadge('link', String(card.dependencies.length), null, 'Depende de '+card.dependencies.length+' actividad(es)'));
+  }
+  cardEl.appendChild(meta);
+
+  if (!isMilestone && card.progress > 0){
+    cardEl.appendChild(el('div', { class:'card-progress-track' }, [
+      el('div', { class:'card-progress-fill', style:'width:'+card.progress+'%' })
+    ]));
+  }
+  return cardEl;
+}
+
+/* ===================== Sección Gantt ===================== */
+/* Genera el <path> de una línea de dependencia entre dos barras del Gantt,
+   siempre como una curva suave en S (bezier cúbica con tangentes horizontales
+   en ambos extremos). Cuando las barras están muy cerca o se solapan
+   (x2 muy próximo a x1, o incluso x2 < x1), un control point de longitud fija
+   evita el doblez brusco que aparecía antes: la curva se arquea verticalmente
+   para rodear en vez de aplastarse en una recta casi horizontal. */
+function dependencyPath(from, to){
+  var x1 = from.offset + from.width, y1 = from.cy;
+  var x2 = to.offset, y2 = to.cy;
+  var gap = x2 - x1;
+  // Media distancia horizontal como "brazo" de la S, con un mínimo generoso
+  // para que la curva sea visible incluso cuando las barras están pegadas o
+  // se solapan (gap negativo).
+  var arm = Math.max(Math.abs(gap) / 2, 26);
+  var c1x = x1 + arm;
+  var c2x = x2 - arm;
+  var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  var d = 'M '+x1+' '+y1+' C '+c1x+' '+y1+', '+c2x+' '+y2+', '+(x2-6)+' '+y2;
+  path.setAttribute('d', d);
+  path.setAttribute('fill', 'none');
+  path.setAttribute('stroke', '#B9C2BF');
+  path.setAttribute('stroke-width', '1.5');
+  path.setAttribute('marker-end', 'url(#dep-arrow)');
+  return path;
+}
+
+/* Reordena manualmente las filas del Gantt: mueve la tarjeta arrastrada a la
+   posición del índice destino dentro de la lista actualmente visible
+   (withDates), y reasigna ganttOrder a TODAS las tarjetas de esa lista según
+   su nuevo orden — así el criterio de orden queda explícito y estable en vez
+   de depender de reconstruir la posición relativa cada vez. */
+function reorderGanttRow(draggedCardId, toIndex, currentList){
+  var ids = currentList.map(function(c){ return c.id; });
+  var fromIndex = ids.indexOf(draggedCardId);
+  if (fromIndex < 0) return;
+  ids.splice(fromIndex, 1);
+  ids.splice(toIndex, 0, draggedCardId);
+
+  var d = STATE.data;
+  ids.forEach(function(id, i){
+    var card = d.cards.find(function(c){ return c.id === id; });
+    if (card) card.ganttOrder = i;
+  });
+  setState({ data: d });
+}
+
+function renderGanttSection(){
+  var section = el('div', { class:'panel-section gantt-section' });
+  var heading = el('div', { class:'panel-heading' }, ['Cronograma', el('span', { class:'line' })]);
+  var columns = boardColumns(activeBoard().id);
+
+  var zoomWrap = el('div', { class:'gantt-zoom', title:'Zoom del cronograma' });
+  zoomWrap.appendChild(svgIcon('zoomOut'));
+  var zoomInput = el('input', {
+    type:'range', min:'0.5', max:'2.5', step:'0.1', value:String(STATE.ganttZoom),
+    class:'gantt-zoom-slider',
+    // No se llama a render() aquí: eso reconstruiría este mismo <input> a mitad
+    // de un arrastre y el navegador perdería la referencia al control que el
+    // usuario está moviendo (el bug real: "el círculo no se mueve"). En vez de
+    // eso, solo se reemplaza el contenido del contenedor del Gantt, dejando
+    // este slider vivo durante todo el gesto.
+    oninput:function(e){
+      STATE.ganttZoom = Number(e.target.value);
+      refreshGanttOnly();
+    }
+  });
+  zoomWrap.appendChild(zoomInput);
+  zoomWrap.appendChild(svgIcon('zoomIn'));
+  heading.appendChild(zoomWrap);
+
+  heading.appendChild(el('button', {
+    class:'btn btn-ghost btn-sm', style:'flex-shrink:0',
+    onclick:function(){
+      if (columns.length === 0){ alert('Este tablero no tiene columnas todavía. Crea una columna primero desde el tablero.'); return; }
+      setState({ modalCard: { id:null, columnId: columns[0].id, dueDate: todayISO() } });
+    }
+  }, ['+ Añadir actividad']));
+  section.appendChild(heading);
+
+  var ganttContainer = el('div', { id:'gantt-container', style:'flex:1;min-height:0;display:flex;flex-direction:column' }, [renderGantt()]);
+  section.appendChild(ganttContainer);
+  return section;
+}
+
+/* Vuelve a dibujar solo el contenido del Gantt (barras, regla, dependencias)
+   sin pasar por render(), para que el slider de zoom y cualquier otro control
+   fuera de #gantt-container no pierda foco ni referencia a mitad de un gesto
+   de arrastre. */
+function refreshGanttOnly(){
+  var container = document.getElementById('gantt-container');
+  if (!container) { render(); return; } // salvaguarda si el contenedor no existe todavía
+  container.innerHTML = '';
+  container.appendChild(renderGantt());
+}
+
+/* Arrastre del borde derecho del panel lateral de actividades del Gantt
+   (la columna con los nombres/índices), para hacerlo más ancho o angosto.
+   Mismo patrón que el resize de columnas del Kanban: se muta el ancho
+   directamente durante el gesto y solo se persiste + refresca el Gantt al
+   soltar, para no perder fluidez ni interrumpir el propio arrastre. */
+function attachGanttSidebarResizeDrag(handle, sidebarEl){
+  handle.addEventListener('mousedown', function(e){
+    e.preventDefault();
+    e.stopPropagation();
+    handle.classList.add('active');
+    var startX = e.clientX;
+    var startWidth = STATE.ganttSidebarWidth || 230;
+    function onMove(ev){
+      var newWidth = Math.max(140, Math.min(480, startWidth + (ev.clientX - startX)));
+      sidebarEl.style.width = newWidth + 'px';
+      sidebarEl.style.minWidth = newWidth + 'px';
+      handle.style.left = newWidth + 'px';
+    }
+    function onUp(){
+      handle.classList.remove('active');
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      STATE.ganttSidebarWidth = parseInt(sidebarEl.style.width, 10);
+      saveData(STATE.data);
+      // El ancho ya quedó aplicado visualmente por el mousemove; no hace
+      // falta refreshGanttOnly aquí, pero si el usuario cambia de vista y
+      // vuelve, renderGantt ya lee STATE.ganttSidebarWidth directamente.
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+  return handle;
+}
+
+function renderGantt(){
+  var cards = filteredCards();
+  var columns = boardColumns(activeBoard().id);
+  // Una actividad normal necesita ambas fechas; un hito solo necesita fecha fin.
+  var withDates = cards.filter(function(c){ return c.type === 'milestone' ? !!c.dueDate : (c.startDate && c.dueDate); });
+  // Orden manual: las filas se pueden arrastrar en el sidebar del Gantt para
+  // reordenarlas (independiente del orden de las columnas del Kanban). Las
+  // que no tienen ganttOrder asignado (actividades antiguas o recién creadas)
+  // van al final, en el orden en que ya estaban.
+  withDates = withDates.slice().sort(function(a, b){
+    var oa = (a.ganttOrder != null) ? a.ganttOrder : 100000;
+    var ob = (b.ganttOrder != null) ? b.ganttOrder : 100000;
+    return oa - ob;
+  });
+
+  if (withDates.length === 0){
+    return el('div', { class:'empty-state' }, [
+      el('div', { class:'big' }, ['Sin fechas para mostrar']),
+      el('div', { class:'small' }, ['Añade fechas a tus actividades o hitos para verlas en el cronograma.'])
+    ]);
+  }
+
+  var allStarts = withDates.map(function(c){ return parseDate(c.startDate || c.dueDate); });
+  var allEnds = withDates.map(function(c){ return parseDate(c.dueDate); });
+  var today = parseDate(todayISO());
+  // El rango del Gantt siempre incluye hoy, aunque ninguna actividad tenga
+  // fechas cercanas a la fecha actual — así la línea de corte nunca desaparece.
+  var minDate = addDays(new Date(Math.min.apply(null, allStarts.concat([today]))), -2);
+  var maxDate = addDays(new Date(Math.max.apply(null, allEnds.concat([today]))), 5);
+  var totalDays = Math.max(daysBetween(minDate, maxDate), 7);
+  var dayWidth = Math.round(32 * STATE.ganttZoom);
+  var rowHeight = 36;
+  var todayOffset = daysBetween(minDate, today) * dayWidth;
+
+  var days = [];
+  for (var i = 0; i < totalDays; i++) days.push(addDays(minDate, i));
+
+  function colOf(id){ return columns.find(function(c){ return c.id === id; }); }
+  var rowIndexById = {};
+  withDates.forEach(function(c, idx){ rowIndexById[c.id] = idx; });
+
+  var wrap = el('div', { class:'gantt-wrap' });
+  var inner = el('div', { class:'gantt-inner' });
+
+  var sidebar = el('div', { class:'gantt-sidebar', style:'width:'+STATE.ganttSidebarWidth+'px;min-width:'+STATE.ganttSidebarWidth+'px' });
+  sidebar.appendChild(el('div', { class:'gantt-sidebar-head' }, [
+    el('span', { class:'gantt-row-index' }, ['#']),
+    'Actividad'
+  ]));
+  withDates.forEach(function(card, idx){
+    var row = el('div', {
+      class:'gantt-row-label', draggable:'true',
+      onclick:function(){ setState({ modalCard: card }); }
+    });
+    row.appendChild(el('span', { class:'gantt-row-index' }, [String(idx + 1)]));
+    if (card.type === 'milestone') row.appendChild(el('span', { class:'milestone-diamond', style:'flex-shrink:0' }));
+    row.appendChild(document.createTextNode(card.title));
+
+    row.addEventListener('dragstart', function(e){
+      STATE.ganttDragCardId = card.id;
+      row.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    row.addEventListener('dragend', function(){
+      STATE.ganttDragCardId = null;
+      row.classList.remove('dragging');
+    });
+    row.addEventListener('dragover', function(e){
+      e.preventDefault();
+      row.classList.add('drag-over-row');
+    });
+    row.addEventListener('dragleave', function(){ row.classList.remove('drag-over-row'); });
+    row.addEventListener('drop', function(e){
+      e.preventDefault();
+      row.classList.remove('drag-over-row');
+      if (STATE.ganttDragCardId && STATE.ganttDragCardId !== card.id){
+        reorderGanttRow(STATE.ganttDragCardId, idx, withDates);
+      }
+    });
+
+    sidebar.appendChild(row);
+  });
+  inner.appendChild(sidebar);
+
+  var sidebarResizeHandle = el('div', { class:'gantt-sidebar-resize-handle', style:'left:'+STATE.ganttSidebarWidth+'px' });
+  attachGanttSidebarResizeDrag(sidebarResizeHandle, sidebar);
+  inner.appendChild(sidebarResizeHandle);
+
+  var scroll = el('div', { class:'gantt-scroll', style:'width:'+(totalDays*dayWidth)+'px' });
+
+  var ruler = el('div', { class:'gantt-ruler' });
+
+  // Fila superior: meses agrupados (uno por cada bloque contiguo de días del mismo mes)
+  var monthsRow = el('div', { class:'gantt-ruler-months' });
+  var i2 = 0;
+  while (i2 < days.length){
+    var m = days[i2].getMonth(), y = days[i2].getFullYear();
+    var span = 0;
+    while (i2 + span < days.length && days[i2+span].getMonth() === m && days[i2+span].getFullYear() === y) span++;
+    var label = days[i2].toLocaleDateString('es-ES', { month:'long', year:'numeric' });
+    monthsRow.appendChild(el('div', { class:'gantt-ruler-month', style:'width:'+(span*dayWidth)+'px' }, [label]));
+    i2 += span;
+  }
+  ruler.appendChild(monthsRow);
+
+  // Fila inferior: día + abreviatura de día de semana, con fin de semana resaltado
+  var daysRow = el('div', { class:'gantt-ruler-days' });
+  days.forEach(function(d){
+    var isToday = daysBetween(d, today) === 0;
+    var weekend = isWeekend(d);
+    daysRow.appendChild(el('div', {
+      class:'gantt-ruler-day' + (isToday?' today':'') + (weekend&&!isToday?' weekend':''),
+      style:'width:'+dayWidth+'px;min-width:'+dayWidth+'px'
+    }, [
+      el('div', { class:'dow' }, [d.toLocaleDateString('es-ES', { weekday:'short' }).slice(0,2)]),
+      el('div', {}, [String(d.getDate())])
+    ]));
+  });
+  ruler.appendChild(daysRow);
+  scroll.appendChild(ruler);
+
+  var gbody = el('div', { class:'gantt-body', style:'height:'+(withDates.length*rowHeight)+'px' });
+
+  // Franjas verticales grises tenues detrás de las barras para cada sábado/domingo
+  days.forEach(function(d, idx){
+    if (isWeekend(d)){
+      gbody.appendChild(el('div', {
+        class:'gantt-weekend-col',
+        style:'left:'+(idx*dayWidth)+'px;width:'+dayWidth+'px;height:'+(withDates.length*rowHeight)+'px'
+      }));
+    }
+  });
+
+  // La línea de corte de "hoy" siempre se dibuja: el rango del Gantt fue
+  // expandido arriba para incluir siempre la fecha actual.
+  if (todayOffset >= 0 && todayOffset <= totalDays*dayWidth){
+    gbody.appendChild(el('div', { class:'gantt-today-line', style:'left:'+(todayOffset+dayWidth/2)+'px;height:'+(withDates.length*rowHeight)+'px' }));
+  }
+
+  // Líneas de dependencia (SVG superpuesto, detrás de las barras pero delante de las franjas)
+  var depSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  depSvg.setAttribute('class', 'gantt-dep-svg');
+  depSvg.setAttribute('width', totalDays*dayWidth);
+  depSvg.setAttribute('height', withDates.length*rowHeight);
+  var defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+  var marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+  marker.setAttribute('id', 'dep-arrow');
+  marker.setAttribute('viewBox', '0 0 8 8'); marker.setAttribute('refX', '7'); marker.setAttribute('refY', '4');
+  marker.setAttribute('markerWidth', '7'); marker.setAttribute('markerHeight', '7'); marker.setAttribute('orient', 'auto-start-reverse');
+  var arrowPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  arrowPath.setAttribute('d', 'M0,0 L8,4 L0,8 z'); arrowPath.setAttribute('fill', '#9BA6A3');
+  marker.appendChild(arrowPath); defs.appendChild(marker); depSvg.appendChild(defs);
+
+  function barGeometry(card){
+    var isM = card.type === 'milestone';
+    var start = parseDate(card.startDate || card.dueDate);
+    var end = parseDate(card.dueDate);
+    var offset = daysBetween(minDate, start) * dayWidth;
+    var width = isM ? dayWidth : Math.max(daysBetween(start, end) * dayWidth + dayWidth, dayWidth);
+    var rowIdx = rowIndexById[card.id];
+    var cy = rowIdx * rowHeight + rowHeight/2;
+    return { offset:offset, width:width, cy:cy, isM:isM };
+  }
+
+  withDates.forEach(function(card){
+    (card.dependencies || []).forEach(function(depId){
+      var depCard = withDates.find(function(c){ return c.id === depId; });
+      if (!depCard) return;
+      depSvg.appendChild(dependencyPath(barGeometry(depCard), barGeometry(card)));
+    });
+  });
+  gbody.appendChild(depSvg);
+
+  withDates.forEach(function(card){
+    var col = colOf(card.columnId);
+    var done = isDoneColumn(col);
+    var priority = PRIORITIES.find(function(p){ return p.key === card.priority; });
+    var geo = barGeometry(card);
+    var track = el('div', { class:'gantt-track' });
+
+    if (card.type === 'milestone'){
+      var diamondColor = done ? 'var(--done)' : (priority ? priority.color : '#8A968F');
+      var diamond = el('div', {
+        class:'gantt-milestone', 'data-card-id': card.id,
+        style:'left:'+(geo.offset+dayWidth/2)+'px;background:'+diamondColor,
+        title: card.title,
+        onclick:function(e){ e.stopPropagation(); setState({ modalCard: card }); }
+      });
+      var msPort = el('div', { class:'gantt-conn-port', title:'Arrastra para crear una dependencia' });
+      attachDependencyDrag(msPort, card, gbody);
+      diamond.appendChild(msPort);
+      track.appendChild(diamond);
+    } else {
+      var barColor = done ? 'var(--done)' : (priority ? priority.color : (col ? col.accent : '#888'));
+      var bar = el('div', {
+        class:'gantt-bar', 'data-card-id': card.id,
+        style:'left:'+geo.offset+'px;width:'+geo.width+'px;background:'+barColor,
+        title: card.title + ' — arrastra los bordes para ajustar fechas',
+        onclick:function(){ setState({ modalCard: card }); }
+      });
+      if (card.progress > 0){
+        bar.appendChild(el('div', { style:'position:absolute;left:0;top:0;bottom:0;width:'+card.progress+'%;background:rgba(0,0,0,0.22);border-radius:7px 0 0 7px;pointer-events:none' }));
+      }
+      var barContent = el('div', { class:'gantt-bar-content' }, [
+        el('span', { class:'gantt-bar-pct' }, [Math.round(card.progress) + '%'])
+      ]);
+      bar.appendChild(barContent);
+
+      // Asas de arrastre en ambos extremos para editar fecha de inicio/fin
+      var leftHandle = el('div', { class:'gantt-bar-handle left' });
+      var rightHandle = el('div', { class:'gantt-bar-handle right' });
+      attachGanttDrag(leftHandle, card, 'start', minDate, dayWidth);
+      attachGanttDrag(rightHandle, card, 'end', minDate, dayWidth);
+      attachGanttDrag(bar, card, 'move', minDate, dayWidth);
+      bar.appendChild(leftHandle);
+      bar.appendChild(rightHandle);
+
+      // Puerto de conexión: arrastrar desde aquí sobre otra barra crea una dependencia
+      var port = el('div', { class:'gantt-conn-port', title:'Arrastra para crear una dependencia' });
+      attachDependencyDrag(port, card, gbody);
+      bar.appendChild(port);
+
+      track.appendChild(bar);
+    }
+    gbody.appendChild(track);
+  });
+  scroll.appendChild(gbody);
+  inner.appendChild(scroll);
+  wrap.appendChild(inner);
+  return wrap;
+}
+
+/* Arrastrar desde el puerto de conexión de una barra/rombo dibuja una línea
+   temporal que sigue el cursor; al soltar sobre otra barra/rombo (detectado
+   con elementFromPoint) se crea la dependencia origen->destino, siempre que
+   no cree un ciclo. Un pequeño SVG "en vivo" se añade y quita del gbody solo
+   durante el arrastre, sin pasar por render() para que sea fluido. */
+function attachDependencyDrag(port, fromCard, gbody){
+  port.addEventListener('mousedown', function(e){
+    e.preventDefault();
+    e.stopPropagation();
+    var gbodyRect = gbody.getBoundingClientRect();
+    var portRect = port.getBoundingClientRect();
+    var startX = portRect.left + portRect.width/2 - gbodyRect.left;
+    var startY = portRect.top + portRect.height/2 - gbodyRect.top;
+
+    var liveSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    liveSvg.setAttribute('class', 'gantt-dep-live-svg');
+    liveSvg.setAttribute('width', gbody.scrollWidth || gbody.offsetWidth);
+    liveSvg.setAttribute('height', gbody.scrollHeight || gbody.offsetHeight);
+    var livePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    livePath.setAttribute('fill', 'none');
+    livePath.setAttribute('stroke', 'var(--accent-dark)');
+    livePath.setAttribute('stroke-width', '2');
+    livePath.setAttribute('stroke-dasharray', '5 4');
+    liveSvg.appendChild(livePath);
+    gbody.appendChild(liveSvg);
+
+    var lastTarget = null;
+    function updatePath(mx, my){
+      var arm = Math.max(Math.abs(mx - startX) / 2, 26);
+      var d = 'M '+startX+' '+startY+' C '+(startX+arm)+' '+startY+', '+(mx-arm)+' '+my+', '+mx+' '+my;
+      livePath.setAttribute('d', d);
+    }
+    updatePath(startX, startY);
+
+    function onMove(ev){
+      var mx = ev.clientX - gbodyRect.left;
+      var my = ev.clientY - gbodyRect.top;
+      updatePath(mx, my);
+      var el2 = document.elementFromPoint(ev.clientX, ev.clientY);
+      var barEl = el2 && el2.closest ? el2.closest('.gantt-bar,.gantt-milestone') : null;
+      if (lastTarget && lastTarget !== barEl) lastTarget.classList.remove('gantt-conn-target');
+      if (barEl && barEl.getAttribute('data-card-id') !== fromCard.id){
+        barEl.classList.add('gantt-conn-target');
+        lastTarget = barEl;
+      } else {
+        lastTarget = null;
+      }
+    }
+    function onUp(ev){
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      liveSvg.remove();
+      if (lastTarget){
+        lastTarget.classList.remove('gantt-conn-target');
+        var targetId = lastTarget.getAttribute('data-card-id');
+        createDependency(targetId, fromCard.id);
+      }
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+}
+
+/* Crea la dependencia targetCardId -> dependsOnCardId (targetCard pasa a
+   depender de dependsOnCard), validando que no exista ya y que no forme
+   un ciclo con las dependencias actuales del tablero. */
+function createDependency(targetCardId, dependsOnCardId){
+  if (!targetCardId || !dependsOnCardId || targetCardId === dependsOnCardId) return;
+  var d = STATE.data;
+  var target = d.cards.find(function(c){ return c.id === targetCardId; });
+  if (!target) return;
+  if (!Array.isArray(target.dependencies)) target.dependencies = [];
+  if (target.dependencies.indexOf(dependsOnCardId) >= 0) return; // ya existe
+
+  // ¿dependsOnCardId ya depende (directa o transitivamente) de targetCardId?
+  // Si es así, añadir esta dependencia crearía un ciclo — se rechaza.
+  var seen = {};
+  function dependsOn(cid, goal){
+    if (cid === goal) return true;
+    if (seen[cid]) return false;
+    seen[cid] = true;
+    var c = d.cards.find(function(x){ return x.id === cid; });
+    if (!c || !c.dependencies) return false;
+    return c.dependencies.some(function(dep){ return dependsOn(dep, goal); });
+  }
+  if (dependsOn(dependsOnCardId, targetCardId)){
+    alert('No se puede crear esta relación: formaría un ciclo entre actividades.');
+    return;
+  }
+
+  target.dependencies.push(dependsOnCardId);
+  setState({ data: d });
+}
+
+/* Arrastre de la barra Gantt: 'start' mueve la fecha de inicio, 'end' la fecha
+   fin, 'move' desplaza ambas manteniendo la duración. Todo en unidades de día
+   completo (snap a dayWidth) para que las fechas resultantes sean limpias. */
+function attachGanttDrag(handle, card, mode, minDate, dayWidth){
+  handle.addEventListener('mousedown', function(e){
+    e.preventDefault();
+    e.stopPropagation();
+    var startX = e.clientX;
+    var origStart = parseDate(card.startDate || card.dueDate);
+    var origEnd = parseDate(card.dueDate);
+    var moved = false;
+    function onMove(ev){
+      var deltaPx = ev.clientX - startX;
+      var deltaDays = Math.round(deltaPx / dayWidth);
+      if (deltaDays === 0) return;
+      moved = true;
+      var newStart = origStart, newEnd = origEnd;
+      if (mode === 'start' || mode === 'move') newStart = addDays(origStart, deltaDays);
+      if (mode === 'end' || mode === 'move') newEnd = addDays(origEnd, deltaDays);
+      if (newStart > newEnd) { if (mode === 'start') newStart = newEnd; else newEnd = newStart; }
+      var d = STATE.data;
+      var liveCard = d.cards.find(function(c){ return c.id === card.id; });
+      if (liveCard){
+        if (mode !== 'end') liveCard.startDate = newStart.toISOString().slice(0,10);
+        if (mode !== 'start') liveCard.dueDate = newEnd.toISOString().slice(0,10);
+        render();
+      }
+    }
+    function onUp(){
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      if (moved) saveData(STATE.data);
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+}
+
+/* ===================== Sidebar de indicadores ===================== */
+function computeStats(){
+  var cards = boardCards(activeBoard().id);
+  var columns = boardColumns(activeBoard().id);
+  var colById = {};
+  columns.forEach(function(c){ colById[c.id] = c; });
+
+  var done = 0, inProgress = 0, pending = 0, overdue = 0, dueSoon = 0, progressSum = 0;
+  var firstColId = columns.length ? columns[0].id : null;
+
+  cards.forEach(function(card){
+    var col = colById[card.columnId];
+    var isDone = isDoneColumn(col);
+    if (isDone) {
+      done++;
+    } else if (card.columnId === firstColId) {
+      pending++;
+    } else {
+      inProgress++;
+    }
+    var status = dueStatus(card.dueDate, isDone);
+    if (status === 'overdue') overdue++;
+    else if (status === 'due-soon') dueSoon++;
+    progressSum += isDone ? 100 : (Number(card.progress) || 0);
+  });
+
+  var total = cards.length;
+  var avgProgress = total ? Math.round(progressSum / total) : 0;
+  return { total:total, done:done, inProgress:inProgress, pending:pending, overdue:overdue, dueSoon:dueSoon, avgProgress:avgProgress };
+}
+
+function renderDonut(pct, size){
+  size = size || 128;
+  var stroke = 13;
+  var r = (size - stroke) / 2;
+  var c = size / 2;
+  var circumference = 2 * Math.PI * r;
+  var offset = circumference * (1 - pct / 100);
+  var ns = 'http://www.w3.org/2000/svg';
+  var svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('width', size);
+  svg.setAttribute('height', size);
+  svg.setAttribute('viewBox', '0 0 ' + size + ' ' + size);
+
+  var track = document.createElementNS(ns, 'circle');
+  track.setAttribute('cx', c); track.setAttribute('cy', c); track.setAttribute('r', r);
+  track.setAttribute('fill', 'none');
+  track.setAttribute('stroke', '#EEF3F1');
+  track.setAttribute('stroke-width', stroke);
+  svg.appendChild(track);
+
+  var arc = document.createElementNS(ns, 'circle');
+  arc.setAttribute('cx', c); arc.setAttribute('cy', c); arc.setAttribute('r', r);
+  arc.setAttribute('fill', 'none');
+  arc.setAttribute('stroke', 'var(--accent)');
+  arc.setAttribute('stroke-width', stroke);
+  arc.setAttribute('stroke-linecap', 'round');
+  arc.setAttribute('stroke-dasharray', circumference);
+  arc.setAttribute('stroke-dashoffset', offset);
+  arc.setAttribute('transform', 'rotate(-90 ' + c + ' ' + c + ')');
+  arc.style.transition = 'stroke-dashoffset .3s ease';
+  svg.appendChild(arc);
+
+  var label = document.createElementNS(ns, 'text');
+  label.setAttribute('x', c); label.setAttribute('y', c + 1);
+  label.setAttribute('text-anchor', 'middle');
+  label.setAttribute('dominant-baseline', 'middle');
+  label.setAttribute('class', 'donut-center-label');
+  label.textContent = pct + '%';
+  svg.appendChild(label);
+
+  var sub = document.createElementNS(ns, 'text');
+  sub.setAttribute('x', c); sub.setAttribute('y', c + 18);
+  sub.setAttribute('text-anchor', 'middle');
+  sub.setAttribute('class', 'donut-center-sub');
+  sub.textContent = 'PROMEDIO';
+  svg.appendChild(sub);
+
+  return el('div', { class:'donut-wrap' }, [svg]);
+}
+
+function renderStatsSidebar(){
+  var stats = computeStats();
+  var sidebar = el('div', { class:'sidebar-stats' });
+
+  if (stats.total === 0){
+    sidebar.appendChild(el('div', { class:'stats-block' }, [
+      el('div', { class:'stats-title' }, ['Resumen']),
+      el('div', { class:'empty-sidebar' }, ['Aún no hay actividades en este tablero. Los indicadores aparecerán aquí en cuanto añadas la primera tarjeta.'])
+    ]));
+    return sidebar;
+  }
+
+  // Bloque: avance promedio (donut)
+  var donutBlock = el('div', { class:'stats-block' });
+  donutBlock.appendChild(el('div', { class:'stats-title' }, ['Avance promedio']));
+  donutBlock.appendChild(renderDonut(stats.avgProgress));
+  sidebar.appendChild(donutBlock);
+
+  // Bloque: progreso general (conteo por estado)
+  var progressBlock = el('div', { class:'stats-block' });
+  progressBlock.appendChild(el('div', { class:'stats-title' }, ['Distribución']));
+
+  var track = el('div', { class:'progress-bar-track' });
+  var segs = [
+    { count: stats.done, color: 'var(--done)' },
+    { count: stats.inProgress, color: 'var(--info)' },
+    { count: stats.pending, color: 'var(--pending)' }
+  ];
+  segs.forEach(function(s){
+    if (s.count > 0) {
+      var w = (s.count / stats.total) * 100;
+      track.appendChild(el('div', { class:'progress-seg', style:'width:'+w+'%;background:'+s.color }));
+    }
+  });
+  progressBlock.appendChild(track);
+
+  var legend = el('div', { class:'progress-legend' });
+  legend.appendChild(el('div', { class:'item' }, [
+    el('span', { class:'sw', style:'background:var(--done)' }), 'Terminadas',
+    el('span', { class:'num' }, [String(stats.done)])
+  ]));
+  legend.appendChild(el('div', { class:'item' }, [
+    el('span', { class:'sw', style:'background:var(--info)' }), 'En curso',
+    el('span', { class:'num' }, [String(stats.inProgress)])
+  ]));
+  legend.appendChild(el('div', { class:'item' }, [
+    el('span', { class:'sw', style:'background:var(--pending)' }), 'Pendientes',
+    el('span', { class:'num' }, [String(stats.pending)])
+  ]));
+  progressBlock.appendChild(legend);
+  sidebar.appendChild(progressBlock);
+
+  // Bloque: indicadores clave
+  var statsBlock = el('div', { class:'stats-block' });
+  statsBlock.appendChild(el('div', { class:'stats-title' }, ['Indicadores']));
+
+  function statRow(label, value, colorClass, dotColor){
+    var labelEl = el('span', { class:'stat-label' }, [dotColor ? el('span', { class:'sw', style:'background:'+dotColor }) : null, label]);
+    return el('div', { class:'stat-row' }, [ labelEl, el('span', { class:'stat-value' + (colorClass?' '+colorClass:'') }, [String(value)]) ]);
+  }
+
+  statsBlock.appendChild(statRow('Total de actividades', stats.total, null, null));
+  statsBlock.appendChild(statRow('Pendientes', stats.pending, null, 'var(--pending)'));
+  statsBlock.appendChild(statRow('En curso', stats.inProgress, null, 'var(--info)'));
+  statsBlock.appendChild(statRow('Terminadas', stats.done, 'done', 'var(--done)'));
+  statsBlock.appendChild(statRow('Por vencer (≤2 días)', stats.dueSoon, stats.dueSoon>0?'warn':null, 'var(--accent)'));
+  statsBlock.appendChild(statRow('Vencidas', stats.overdue, stats.overdue>0?'danger':null, 'var(--danger)'));
+
+  sidebar.appendChild(statsBlock);
+  return sidebar;
+}
+
+/* ===================== Modal de tarjeta ===================== */
+function renderCardModal(initial){
+  var isNew = !initial.id;
+  var columns = boardColumns(activeBoard().id);
+  var form = {
+    type: initial.type || 'task',
+    title: initial.title || '',
+    description: initial.description || '',
+    columnId: initial.columnId,
+    startDate: initial.startDate || todayISO(),
+    dueDate: initial.dueDate || '',
+    priority: initial.priority || 'med',
+    progress: initial.progress || 0,
+    dependencies: (initial.dependencies || []).slice(),
+    assigneeId: initial.assigneeId || null
+  };
+
+  var overlay = el('div', { class:'modal-overlay' });
+  overlay.addEventListener('mousedown', function(e){ if (e.target === overlay) setState({ modalCard:null }); });
+
+  var modal = el('div', { class:'modal' });
+  var head = el('div', { class:'modal-head' }, [
+    el('h3', {}, [isNew ? 'Nueva actividad' : 'Editar actividad']),
+    el('button', { class:'btn btn-ghost btn-icon', onclick:function(){ setState({ modalCard:null }); } }, ['✕'])
+  ]);
+  modal.appendChild(head);
+
+  var body = el('div', { class:'modal-body' });
+
+  // Tipo: Actividad vs Hito (referencia Primavera P6)
+  var typePicker = el('div', { class:'priority-picker' });
+  var startField; // referencia para poder ocultar/mostrar según el tipo
+  function refreshTypePicker(){
+    typePicker.innerHTML = '';
+    ACTIVITY_TYPES.forEach(function(t){
+      typePicker.appendChild(el('div', {
+        class:'priority-opt' + (form.type===t.key?' selected':''),
+        style:'color:var(--text)',
+        onclick:function(){
+          form.type = t.key;
+          if (t.key === 'milestone') form.startDate = form.dueDate || form.startDate;
+          refreshTypePicker();
+          if (startField) startField.style.display = (form.type === 'milestone') ? 'none' : '';
+        }
+      }, [t.label]));
+    });
+  }
+  refreshTypePicker();
+  body.appendChild(el('div', { class:'field' }, [ el('label', {}, ['Tipo']), typePicker ]));
+
+  var titleInput = el('input', { type:'text', value: form.title, placeholder:'¿Qué hay que hacer?' });
+  titleInput.addEventListener('input', function(e){ form.title = e.target.value; });
+  body.appendChild(el('div', { class:'field' }, [ el('label', {}, ['Título']), titleInput ]));
+
+  var descInput = el('textarea', { placeholder:'Detalles, notas, contexto...' }, [form.description]);
+  descInput.value = form.description;
+  descInput.addEventListener('input', function(e){ form.description = e.target.value; });
+  body.appendChild(el('div', { class:'field' }, [ el('label', {}, ['Descripción']), descInput ]));
+
+  var select = el('select', {});
+  columns.forEach(function(c){
+    var opt = el('option', { value:c.id }, [c.name]);
+    if (c.id === form.columnId) opt.selected = true;
+    select.appendChild(opt);
+  });
+  select.addEventListener('change', function(e){ form.columnId = e.target.value; });
+  body.appendChild(el('div', { class:'field' }, [ el('label', {}, ['Columna']), select ]));
+
+  var startInput = el('input', { type:'date', value: form.startDate });
+  startInput.addEventListener('input', function(e){ form.startDate = e.target.value; });
+  var dueInput = el('input', { type:'date', value: form.dueDate });
+  dueInput.addEventListener('input', function(e){ form.dueDate = e.target.value; });
+  startField = el('div', { class:'field' }, [ el('label', {}, ['Fecha inicio']), startInput ]);
+  if (form.type === 'milestone') startField.style.display = 'none';
+  body.appendChild(el('div', { class:'field-row' }, [
+    startField,
+    el('div', { class:'field' }, [ el('label', {}, [form.type==='milestone' ? 'Fecha del hito' : 'Fecha límite']), dueInput ])
+  ]));
+
+  var priorityPicker = el('div', { class:'priority-picker' });
+  function refreshPriorityPicker(){
+    priorityPicker.innerHTML = '';
+    PRIORITIES.forEach(function(p){
+      priorityPicker.appendChild(el('div', {
+        class:'priority-opt' + (form.priority===p.key?' selected':''),
+        style:'color:'+p.color,
+        onclick:function(){ form.priority = p.key; refreshPriorityPicker(); }
+      }, [p.label]));
+    });
+  }
+  refreshPriorityPicker();
+  body.appendChild(el('div', { class:'field' }, [ el('label', {}, ['Prioridad']), priorityPicker ]));
+
+  // Responsable: selector desplegable poblado desde el roster global de personas.
+  // Importante: añadir una persona desde aquí NO debe disparar un render()
+  // completo de la app (eso reconstruiría este mismo modal desde "initial" y
+  // se perderían título/descripción/etc. que el usuario ya haya escrito sin
+  // guardar) — por eso usa addPersonQuiet() y actualiza el <select> a mano.
+  var people = (STATE.data.people || []).slice();
+  var assigneeRow = el('div', { style:'display:flex; gap:8px; align-items:center' });
+  var assigneeSelect = el('select', { style:'flex:1' });
+  function rebuildAssigneeOptions(){
+    assigneeSelect.innerHTML = '';
+    assigneeSelect.appendChild(el('option', { value:'' }, ['Sin asignar']));
+    people.forEach(function(p){
+      var opt = el('option', { value:p.id }, [p.name + (p.role ? ' — ' + p.role : '')]);
+      if (p.id === form.assigneeId) opt.selected = true;
+      assigneeSelect.appendChild(opt);
+    });
+  }
+  rebuildAssigneeOptions();
+  assigneeSelect.addEventListener('change', function(e){ form.assigneeId = e.target.value || null; refreshNotifyBtn(); });
+  assigneeRow.appendChild(el('div', { style:'flex:1' }, [assigneeSelect]));
+
+  var notifyBtn = el('button', { class:'btn btn-sm', type:'button' }, [svgIcon('mail'), ' Notificar']);
+  function refreshNotifyBtn(){
+    var person = people.find(function(p){ return p.id === form.assigneeId; });
+    var canNotify = person && person.email;
+    notifyBtn.disabled = !canNotify;
+    notifyBtn.style.opacity = canNotify ? '1' : '0.45';
+    notifyBtn.style.cursor = canNotify ? 'pointer' : 'not-allowed';
+    notifyBtn.title = canNotify ? ('Abrir un correo para avisar a ' + person.name) : 'Selecciona un responsable con correo registrado';
+  }
+  notifyBtn.addEventListener('click', function(){
+    var person = people.find(function(p){ return p.id === form.assigneeId; });
+    if (!person || !person.email) return;
+    notifyAssigneeByEmail(person, {
+      title: form.title || '(sin título todavía)',
+      dueDate: form.dueDate,
+      priority: form.priority,
+      progress: form.progress,
+      type: form.type
+    });
+  });
+  refreshNotifyBtn();
+  assigneeRow.appendChild(notifyBtn);
+
+  // Mini-formulario local para añadir una persona sin cerrar ni reconstruir
+  // el modal de tarjeta.
+  var addPersonToggle = el('button', {
+    class:'btn btn-ghost btn-sm', type:'button', style:'align-self:flex-start;margin-top:6px;padding-left:0'
+  }, [svgIcon('plus'), ' Añadir una persona al equipo']);
+  var addPersonForm = el('div', { class:'hidden', style:'display:none;gap:8px;margin-top:8px' });
+  var apName = el('input', { type:'text', placeholder:'Nombre' });
+  var apRole = el('input', { type:'text', placeholder:'Rol' });
+  var apEmail = el('input', { type:'text', placeholder:'Correo' });
+  var apSubmit = el('button', { class:'btn btn-accent btn-sm', type:'button' }, ['Añadir']);
+  function submitInlinePerson(){
+    if (!apName.value.trim()){ alert('Escribe al menos el nombre.'); return; }
+    var newId = addPersonQuiet(apName.value, apRole.value, apEmail.value);
+    var newPerson = STATE.data.people.find(function(p){ return p.id === newId; });
+    people.push(newPerson);
+    form.assigneeId = newId;
+    rebuildAssigneeOptions();
+    refreshNotifyBtn();
+    apName.value = ''; apRole.value = ''; apEmail.value = '';
+    addPersonForm.style.display = 'none';
+  }
+  apSubmit.addEventListener('click', submitInlinePerson);
+  [apName, apRole, apEmail].forEach(function(inp){
+    inp.addEventListener('keydown', function(e){ if (e.key === 'Enter'){ e.preventDefault(); submitInlinePerson(); } });
+  });
+  addPersonForm.appendChild(el('div', { style:'display:flex;gap:8px;flex:1' }, [apName, apRole, apEmail]));
+  addPersonForm.appendChild(apSubmit);
+  addPersonToggle.addEventListener('click', function(){
+    var show = addPersonForm.style.display === 'none';
+    addPersonForm.style.display = show ? 'flex' : 'none';
+    if (show) apName.focus();
+  });
+
+  body.appendChild(el('div', { class:'field' }, [
+    el('label', {}, ['Responsable']),
+    assigneeRow,
+    addPersonToggle,
+    addPersonForm
+  ]));
+
+  var progressLabel = el('label', {}, ['Progreso: ' + form.progress + '%']);
+  var progressInput = el('input', { type:'range', min:'0', max:'100', step:'5', value:form.progress });
+  progressInput.addEventListener('input', function(e){ form.progress = Number(e.target.value); progressLabel.textContent = 'Progreso: ' + form.progress + '%'; });
+  body.appendChild(el('div', { class:'field' }, [ progressLabel, progressInput ]));
+
+  // Dependencias: cualquier otra tarjeta del mismo tablero, excluyendo a sí misma
+  // y a cualquier tarjeta que ya dependa (directa o indirectamente) de esta, para
+  // no permitir crear un ciclo A->B->A desde este selector.
+  var candidateCards = boardCards(activeBoard().id).filter(function(c){ return c.id !== initial.id; });
+  function wouldCreateCycle(candidateId){
+    // ¿candidateId depende (directa o transitivamente) de la tarjeta que estamos editando?
+    if (!initial.id) return false;
+    var seen = {};
+    function dependsOnInitial(cid){
+      if (cid === initial.id) return true;
+      if (seen[cid]) return false;
+      seen[cid] = true;
+      var c = STATE.data.cards.find(function(x){ return x.id === cid; });
+      if (!c || !c.dependencies) return false;
+      return c.dependencies.some(dependsOnInitial);
+    }
+    return dependsOnInitial(candidateId);
+  }
+  var depBox = el('div', { style:'max-height:130px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;border:1px solid var(--border);border-radius:8px;padding:8px;background:var(--panel-2)' });
+  if (candidateCards.length === 0){
+    depBox.appendChild(el('div', { style:'font-size:12px;color:var(--text-faint)' }, ['No hay otras actividades en este tablero todavía.']));
+  } else {
+    candidateCards.forEach(function(c){
+      var blocked = wouldCreateCycle(c.id);
+      var row = el('label', { style:'display:flex;align-items:center;gap:8px;font-size:12.5px;color:'+(blocked?'var(--text-faint)':'var(--text)')+';cursor:'+(blocked?'not-allowed':'pointer') });
+      var cb = el('input', { type:'checkbox' });
+      cb.checked = form.dependencies.indexOf(c.id) >= 0;
+      cb.disabled = blocked;
+      cb.addEventListener('change', function(){
+        var idx = form.dependencies.indexOf(c.id);
+        if (cb.checked && idx < 0) form.dependencies.push(c.id);
+        else if (!cb.checked && idx >= 0) form.dependencies.splice(idx, 1);
+      });
+      row.appendChild(cb);
+      row.appendChild(document.createTextNode(c.title + (blocked ? ' (crearía un ciclo)' : '')));
+      depBox.appendChild(row);
+    });
+  }
+  body.appendChild(el('div', { class:'field' }, [ el('label', {}, ['Depende de']), depBox ]));
+
+  modal.appendChild(body);
+
+  var foot = el('div', { class:'modal-foot' });
+  var leftFoot = el('div', {});
+  if (!isNew){
+    leftFoot.appendChild(el('button', {
+      class:'btn btn-ghost', style:'color:var(--danger)',
+      onclick:function(){ deleteCard(initial.id); }
+    }, ['Eliminar']));
+  }
+  foot.appendChild(leftFoot);
+  var rightFoot = el('div', { class:'row' });
+  rightFoot.appendChild(el('button', { class:'btn btn-ghost', onclick:function(){ setState({ modalCard:null }); } }, ['Cancelar']));
+  rightFoot.appendChild(el('button', {
+    class:'btn btn-accent',
+    onclick:function(){
+      if (!form.title.trim()){ alert('El título no puede estar vacío.'); return; }
+      if (!form.dueDate){ alert(form.type==='milestone' ? 'El hito necesita una fecha.' : 'La actividad necesita una fecha límite.'); return; }
+      var boardId = columns.find(function(c){ return c.id === form.columnId; }).boardId;
+      upsertCard({
+        id: initial.id || uid(),
+        boardId: boardId,
+        columnId: form.columnId,
+        order: initial.order != null ? initial.order : 0,
+        ganttOrder: initial.ganttOrder,
+        type: form.type,
+        title: form.title.trim(),
+        description: form.description,
+        startDate: form.type === 'milestone' ? form.dueDate : form.startDate,
+        dueDate: form.dueDate,
+        priority: form.priority,
+        progress: form.type === 'milestone' ? (form.progress >= 100 ? 100 : 0) : Number(form.progress),
+        dependencies: form.dependencies,
+        assigneeId: form.assigneeId
+      });
+    }
+  }, ['Guardar']));
+  foot.appendChild(rightFoot);
+  modal.appendChild(foot);
+
+  overlay.appendChild(modal);
+  return overlay;
+}
+
+/* ===================== Confirmación de borrado de tablero ===================== */
+/* ===================== Selector de color de columna ===================== */
+function renderColumnColorPicker(colId){
+  var isRecolor = !!colId;
+  var overlay = el('div', { class:'modal-overlay' });
+  function close(){ setState({ newColumnPicker:false, recolorColumn:null }); }
+  overlay.addEventListener('mousedown', function(e){ if (e.target === overlay) close(); });
+
+  var modal = el('div', { class:'modal', style:'max-width:420px' });
+  modal.appendChild(el('div', { class:'modal-head' }, [
+    el('h3', {}, [isRecolor ? 'Cambiar color de columna' : 'Color de la nueva columna']),
+    el('button', { class:'btn btn-ghost btn-icon', onclick:close }, ['✕'])
+  ]));
+
+  var body = el('div', { class:'modal-body' });
+  body.appendChild(el('p', { style:'margin:0;font-size:12.5px;color:var(--text-dim);line-height:1.5' }, [
+    'Elige un color pastel para diferenciar esta columna del resto.'
+  ]));
+  var grid = el('div', { style:'display:flex;flex-wrap:wrap;gap:10px' });
+  COLUMN_PALETTE.forEach(function(p, idx){
+    var swatch = el('button', {
+      style:'width:64px;height:56px;border-radius:10px;border:2px solid '+p.accent+';background:'+p.bg+';display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:600;color:'+p.accent+';cursor:pointer',
+      onclick:function(){
+        if (isRecolor){
+          var d = STATE.data;
+          var col = d.columns.find(function(c){ return c.id === colId; });
+          if (col){ col.bg = p.bg; col.accent = p.accent; }
+          setState({ data: d, recolorColumn: null });
+        } else {
+          confirmAddColumn(idx);
+        }
+      }
+    }, [p.name]);
+    grid.appendChild(swatch);
+  });
+  body.appendChild(grid);
+  modal.appendChild(body);
+
+  var foot = el('div', { class:'modal-foot', style:'justify-content:flex-end' });
+  foot.appendChild(el('button', { class:'btn btn-ghost', onclick:close }, ['Cancelar']));
+  modal.appendChild(foot);
+
+  overlay.appendChild(modal);
+  return overlay;
+}
+
+function renderConfirmModal(){
+  var boardId = STATE.confirmDeleteBoard;
+  var board = STATE.data.boards.find(function(b){ return b.id === boardId; });
+  var overlay = el('div', { class:'modal-overlay' });
+  overlay.addEventListener('mousedown', function(e){ if (e.target === overlay) setState({ confirmDeleteBoard:null }); });
+  var modal = el('div', { class:'modal', style:'max-width:420px' });
+  modal.appendChild(el('div', { class:'modal-head' }, [ el('h3', {}, ['Eliminar tablero']) ]));
+  modal.appendChild(el('div', { class:'modal-body' }, [
+    el('p', { style:'margin:0;font-size:13px;color:var(--text-dim);line-height:1.5' },
+      ['Se eliminará el tablero "' + (board ? board.name : '') + '" y todas sus tarjetas. Esta acción no se puede deshacer.'])
+  ]));
+  var foot = el('div', { class:'modal-foot', style:'justify-content:flex-end' });
+  var row = el('div', { class:'row' });
+  row.appendChild(el('button', { class:'btn btn-ghost', onclick:function(){ setState({ confirmDeleteBoard:null }); } }, ['Cancelar']));
+  row.appendChild(el('button', { class:'btn', style:'background:var(--danger);border-color:var(--danger);color:#fff', onclick:function(){ deleteBoard(boardId); } }, ['Eliminar']));
+  foot.appendChild(row);
+  modal.appendChild(foot);
+  overlay.appendChild(modal);
+  return overlay;
+}
+
+function renderConfirmDeleteCardModal(){
+  var cardId = STATE.confirmDeleteCard;
+  var card = STATE.data.cards.find(function(c){ return c.id === cardId; });
+  var dependents = dependentsOf(cardId);
+  var overlay = el('div', { class:'modal-overlay' });
+  overlay.addEventListener('mousedown', function(e){ if (e.target === overlay) setState({ confirmDeleteCard:null }); });
+  var modal = el('div', { class:'modal', style:'max-width:460px' });
+  modal.appendChild(el('div', { class:'modal-head' }, [ el('h3', {}, ['Esta actividad tiene dependencias']) ]));
+  var body = el('div', { class:'modal-body' });
+  body.appendChild(el('p', { style:'margin:0;font-size:13px;color:var(--text-dim);line-height:1.5' }, [
+    (dependents.length === 1 ? 'Una actividad depende' : dependents.length + ' actividades dependen') +
+    ' de "' + (card ? card.title : '') + '". Si la eliminas, esas relaciones se romperán:'
+  ]));
+  var list = el('ul', { style:'margin:0;padding-left:18px;font-size:12.5px;color:var(--text-dim);display:flex;flex-direction:column;gap:4px' });
+  dependents.forEach(function(dep){ list.appendChild(el('li', {}, [dep.title])); });
+  body.appendChild(list);
+  modal.appendChild(body);
+  var foot = el('div', { class:'modal-foot', style:'justify-content:flex-end' });
+  var row = el('div', { class:'row' });
+  row.appendChild(el('button', { class:'btn btn-ghost', onclick:function(){ setState({ confirmDeleteCard:null }); } }, ['Cancelar']));
+  row.appendChild(el('button', { class:'btn', style:'background:var(--danger);border-color:var(--danger);color:#fff', onclick:function(){ forceDeleteCard(cardId); } }, ['Eliminar de todos modos']));
+  foot.appendChild(row);
+  modal.appendChild(foot);
+  overlay.appendChild(modal);
+  return overlay;
+}
+
+/* ===================== Modal de importación ===================== */
+/* ===================== Modal de envío de resumen por correo ===================== */
+/* ===================== Modal de gestión de equipo/personas ===================== */
+function renderPeopleModal(){
+  var people = (STATE.data.people || []).slice().sort(function(a,b){ return a.name.localeCompare(b.name); });
+  var overlay = el('div', { class:'modal-overlay' });
+  function close(){ setState({ peopleModal:false }); }
+  overlay.addEventListener('mousedown', function(e){ if (e.target === overlay) close(); });
+
+  var modal = el('div', { class:'modal', style:'max-width:520px' });
+  modal.appendChild(el('div', { class:'modal-head' }, [
+    el('h3', {}, ['Equipo']),
+    el('button', { class:'btn btn-ghost btn-icon', onclick:close }, ['✕'])
+  ]));
+
+  var body = el('div', { class:'modal-body' });
+  body.appendChild(el('p', { style:'margin:0;font-size:12.5px;color:var(--text-dim);line-height:1.5' }, [
+    'Estas personas están disponibles como responsables en cualquier actividad de cualquier tablero. Puedes añadir las que necesites.'
+  ]));
+
+  // Lista de personas existentes
+  var list = el('div', { style:'display:flex;flex-direction:column;gap:8px;max-height:220px;overflow-y:auto' });
+  if (people.length === 0){
+    list.appendChild(el('div', { style:'font-size:12px;color:var(--text-faint);padding:8px 0' }, ['Todavía no has añadido a nadie.']));
+  }
+  people.forEach(function(p){
+    var row = el('div', { style:'display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--panel-2);border:1px solid var(--border-soft);border-radius:8px' });
+    row.appendChild(el('div', { style:'width:28px;height:28px;border-radius:50%;background:var(--accent-soft);color:var(--accent-dark);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0' }, [
+      (p.name.trim()[0] || '?').toUpperCase()
+    ]));
+    var infoCol = el('div', { style:'flex:1;min-width:0' }, [
+      el('div', { style:'font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis' }, [p.name]),
+      el('div', { style:'font-size:11.5px;color:var(--text-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis' }, [
+        [p.role, p.email].filter(Boolean).join(' · ') || 'Sin rol ni correo'
+      ])
+    ]);
+    row.appendChild(infoCol);
+    row.appendChild(el('button', {
+      class:'btn btn-ghost btn-icon', title:'Eliminar de la lista',
+      onclick:function(){
+        if (confirm('¿Quitar a "' + p.name + '" del equipo? Las actividades que tenía asignadas quedarán sin responsable.')){
+          deletePerson(p.id);
+        }
+      }
+    }, ['✕']));
+    list.appendChild(row);
+  });
+  body.appendChild(el('div', { class:'field' }, [ el('label', {}, ['Personas actuales']), list ]));
+
+  // Formulario para añadir una nueva persona
+  var newName = el('input', { type:'text', placeholder:'Nombre completo' });
+  var newRole = el('input', { type:'text', placeholder:'Rol (ej. Diseñadora, PM...)' });
+  var newEmail = el('input', { type:'text', placeholder:'correo@ejemplo.com' });
+  function submitNewPerson(){
+    if (!newName.value.trim()){ alert('Escribe al menos el nombre.'); return; }
+    addPerson(newName.value, newRole.value, newEmail.value);
+    setState({ peopleModal:true }); // vuelve a abrir el modal ya refrescado con la nueva persona
+  }
+  [newName, newRole, newEmail].forEach(function(inp){
+    inp.addEventListener('keydown', function(e){ if (e.key === 'Enter') submitNewPerson(); });
+  });
+
+  var addRow = el('div', { style:'display:flex;gap:8px;margin-top:4px' }, [
+    el('div', { style:'flex:1' }, [newName]),
+    el('div', { style:'flex:1' }, [newRole]),
+    el('div', { style:'flex:1' }, [newEmail])
+  ]);
+  body.appendChild(el('div', { class:'field' }, [
+    el('label', {}, ['Añadir persona']),
+    addRow,
+    el('button', { class:'btn btn-accent btn-sm', style:'margin-top:8px;align-self:flex-start', onclick:submitNewPerson }, [svgIcon('plus'), ' Añadir al equipo'])
+  ]));
+
+  modal.appendChild(body);
+
+  var foot = el('div', { class:'modal-foot', style:'justify-content:flex-end' });
+  foot.appendChild(el('button', { class:'btn btn-ghost', onclick:close }, ['Cerrar']));
+  modal.appendChild(foot);
+
+  overlay.appendChild(modal);
+  return overlay;
+}
+
+function renderEmailModal(){
+  var stats = computeStats();
+  var recipientsValue = loadSavedRecipients();
+  var overlay = el('div', { class:'modal-overlay' });
+  function close(){ setState({ emailModal:false }); }
+  overlay.addEventListener('mousedown', function(e){ if (e.target === overlay) close(); });
+
+  var modal = el('div', { class:'modal', style:'max-width:480px' });
+  modal.appendChild(el('div', { class:'modal-head' }, [
+    el('h3', {}, ['Enviar resumen por correo']),
+    el('button', { class:'btn btn-ghost btn-icon', onclick:close }, ['✕'])
+  ]));
+
+  var body = el('div', { class:'modal-body' });
+  body.appendChild(el('p', { style:'margin:0;font-size:12.5px;color:var(--text-dim);line-height:1.5' }, [
+    'Esto abrirá tu programa de correo (Outlook, Gmail, etc.) con el resumen ya redactado — tú confirmas el envío desde ahí. Aún no se automatiza el envío periódico; primero prueba cómo se ve.'
+  ]));
+
+  var input = el('input', { type:'text', placeholder:'correo1@ejemplo.com, correo2@ejemplo.com', value:recipientsValue });
+  body.appendChild(el('div', { class:'field' }, [ el('label', {}, ['Destinatarios (separados por coma)']), input ]));
+
+  var previewBox = el('div', {
+    style:'max-height:150px;overflow-y:auto;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:11.5px;color:var(--text-dim);white-space:pre-wrap;font-family:inherit;line-height:1.5'
+  }, [
+    'Total: ' + stats.total + ' · Pendientes: ' + stats.pending + ' · En curso: ' + stats.inProgress +
+    ' · Terminadas: ' + stats.done + ' · Vencidas: ' + stats.overdue + ' · Avance promedio: ' + stats.avgProgress + '%\n\n' +
+    'El correo incluye además el detalle individual de cada actividad (columna, estado y % de avance).'
+  ]);
+  body.appendChild(el('div', { class:'field' }, [ el('label', {}, ['Vista previa del resumen general']), previewBox ]));
+
+  modal.appendChild(body);
+
+  var foot = el('div', { class:'modal-foot', style:'justify-content:flex-end' });
+  var row = el('div', { class:'row' });
+  row.appendChild(el('button', { class:'btn btn-ghost', onclick:close }, ['Cancelar']));
+  row.appendChild(el('button', {
+    class:'btn btn-accent',
+    onclick:function(){
+      var raw = input.value.trim();
+      if (!raw){ alert('Escribe al menos un correo destinatario.'); return; }
+      var recipients = raw.split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+      saveRecipients(raw);
+      sendStatusEmail(recipients);
+      close();
+    }
+  }, [svgIcon('mail'), ' Abrir en mi correo']));
+  foot.appendChild(row);
+  modal.appendChild(foot);
+
+  overlay.appendChild(modal);
+  return overlay;
+}
+
+function renderImportModal(){
+  var overlay = el('div', { class:'modal-overlay' });
+  overlay.addEventListener('mousedown', function(e){ if (e.target === overlay) setState({ importModal:false, importError:null }); });
+  var modal = el('div', { class:'modal', style:'max-width:460px' });
+  modal.appendChild(el('div', { class:'modal-head' }, [
+    el('h3', {}, ['Importar datos']),
+    el('button', { class:'btn btn-ghost btn-icon', onclick:function(){ setState({ importModal:false, importError:null }); } }, ['✕'])
+  ]));
+
+  var body = el('div', { class:'modal-body' });
+  body.appendChild(el('p', { style:'margin:0;font-size:12.5px;color:var(--text-dim);line-height:1.5' }, [
+    'Selecciona un archivo .json exportado previamente desde TaskBoard. Esto reemplazará todos los tableros, columnas y tarjetas actuales.'
+  ]));
+
+  var fileInput = el('input', { type:'file', accept:'.json,application/json', class:'hidden' });
+  var drop = el('div', { class:'import-drop' }, [
+    el('strong', {}, ['Haz clic para elegir un archivo']), ' o arrástralo aquí'
+  ]);
+  drop.addEventListener('click', function(){ fileInput.click(); });
+  drop.addEventListener('dragover', function(e){ e.preventDefault(); drop.classList.add('drag-over'); });
+  drop.addEventListener('dragleave', function(){ drop.classList.remove('drag-over'); });
+  drop.addEventListener('drop', function(e){
+    e.preventDefault(); drop.classList.remove('drag-over');
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) handleImportFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', function(e){
+    if (e.target.files && e.target.files[0]) handleImportFile(e.target.files[0]);
+  });
+
+  body.appendChild(drop);
+  body.appendChild(fileInput);
+
+  if (STATE.importError){
+    body.appendChild(el('p', { style:'margin:0;font-size:12px;color:var(--danger)' }, [STATE.importError]));
+  }
+
+  modal.appendChild(body);
+
+  var foot = el('div', { class:'modal-foot', style:'justify-content:flex-end' });
+  foot.appendChild(el('button', { class:'btn btn-ghost', onclick:function(){ setState({ importModal:false, importError:null }); } }, ['Cancelar']));
+  modal.appendChild(foot);
+
+  overlay.appendChild(modal);
+  return overlay;
+}
+
+function handleImportFile(file){
+  importDataFromFile(file, function(ok, error, incoming){
+    if (!ok){
+      setState({ importError: error });
+      return;
+    }
+    if (!confirm('Esto reemplazará todos tus datos actuales por los del archivo importado. ¿Continuar?')){
+      return;
+    }
+    if (!incoming.activeBoard && incoming.boards.length) incoming.activeBoard = incoming.boards[0].id;
+    STATE.data = incoming;
+    setState({ data: incoming, importModal:false, importError:null, modalCard:null });
+  });
+}
+
+/* ===================== Inicio =====================
+   render() inicial muestra la pantalla de carga (STATE.loading = true por
+   defecto); initApp() trae los datos compartidos y dispara el render real
+   cuando terminan de llegar. */
+try {
+  render();
+  initApp();
+} catch (e) {
+  var elx = document.getElementById('boot-error');
+  var detail = document.getElementById('boot-error-detail');
+  detail.textContent = (e && e.stack) || String(e);
+  elx.classList.add('show');
+}
+
+
+
+
+
+
+
+
+
+</script>
+</body>
+</html>
